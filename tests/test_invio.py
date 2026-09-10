@@ -43,5 +43,10 @@ class TestInvio(unittest.TestCase):
         res = invia(_spec(), 4, FakeSession(mdl_riletto="352"), FakeRoster())
         self.assertFalse(res["verificato"])
 
+    def test_spec_invalido_solleva_invioerror(self):
+        # build_payload rifiuta il modulo -> ValidationError deve diventare InvioError
+        with self.assertRaises(InvioError):
+            invia(dict(_spec(), modulo="999"), 4, FakeSession(), FakeRoster())
+
 if __name__ == "__main__":
     unittest.main()
