@@ -1,5 +1,8 @@
 """Orchestrazione: guida le transizioni su eventi utente e su scadenza timer."""
+from datetime import datetime, date, time
+from zoneinfo import ZoneInfo
 from bot import giornata as gio
+from bot import orari
 from bot.brain import BrainError
 from bot.invio import InvioError
 from bot.state import PROPOSTA
@@ -99,9 +102,6 @@ class Engine:
             self.invia_ora(idcomp, cmday)
 
     def heartbeat(self, provider, oggi_iso=None):
-        from datetime import datetime, date, time
-        from zoneinfo import ZoneInfo
-        from bot import orari
         tz = self.settings.tz
         oggi = date.fromisoformat(oggi_iso) if oggi_iso else datetime.now(ZoneInfo(tz)).date()
         adesso = datetime.combine(oggi, time(0, 0), ZoneInfo(tz))  # inizio giornata: i kickoff odierni sono "futuri"
@@ -130,7 +130,8 @@ class Engine:
             res, _session, _ = provider()
             mdl_sito = res.get("teamLineupDto", {}).get("mdl")
             atteso = (g.spec or {}).get("modulo")
-            if mdl_sito and atteso and mdl_sito == atteso:
+            def _norm(m): return str(m).replace("-", "").strip() if m else ""
+            if mdl_sito and atteso and _norm(mdl_sito) == _norm(atteso):
                 self.store.segna_inviata(g.idcomp, g.cmday)
             else:
                 self.store.segna_errore(g.idcomp, g.cmday, "invio interrotto: verifica manuale")

@@ -179,6 +179,36 @@ class TestEngine(unittest.TestCase):
         e.heartbeat(provider)
         self.assertIsNone(self.store.get(700047, 4))
 
+    def test_riconcilia_verifica_invio_ok(self):
+        e = self._engine()
+        self.store.crea_se_assente(700047, 4, ORA)
+        self.store.set_proposta(700047, 4, SPEC, "m", ORA)
+        self.store.prova_lock_invio(700047, 4)   # -> INVIO_IN_CORSO
+        g = self.store.get(700047, 4)
+        def provider(): return ({"teamLineupDto": {"mdl": "343"}}, object(), None)
+        e.on_evento_riconcilia("verifica_invio", g, provider)
+        self.assertEqual(self.store.get(700047, 4).stato, INVIATA)
+
+    def test_riconcilia_verifica_invio_mismatch_va_in_errore(self):
+        e = self._engine()
+        self.store.crea_se_assente(700047, 4, ORA)
+        self.store.set_proposta(700047, 4, SPEC, "m", ORA)
+        self.store.prova_lock_invio(700047, 4)
+        g = self.store.get(700047, 4)
+        def provider(): return ({"teamLineupDto": {"mdl": "352"}}, object(), None)
+        e.on_evento_riconcilia("verifica_invio", g, provider)
+        self.assertEqual(self.store.get(700047, 4).stato, ERRORE)
+
+    def test_riconcilia_invia(self):
+        chiamate = []
+        e = self._engine(invia_fn=lambda *a: chiamate.append(1) or {"mdl": "343", "verificato": True})
+        self.store.crea_se_assente(700047, 4, ORA)
+        self.store.set_proposta(700047, 4, SPEC, "m", ORA)   # PROPOSTA
+        g = self.store.get(700047, 4)
+        e.on_evento_riconcilia("invia", g, prov_ok)
+        self.assertEqual(len(chiamate), 1)
+        self.assertEqual(self.store.get(700047, 4).stato, INVIATA)
+
 
 if __name__ == "__main__":
     unittest.main()

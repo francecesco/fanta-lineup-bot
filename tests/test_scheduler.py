@@ -23,6 +23,16 @@ class TestScheduler(unittest.TestCase):
         g = G(INVIO_IN_CORSO, datetime(2026, 9, 12, 14, 30, tzinfo=timezone.utc))
         self.assertEqual(scheduler.azioni_riconciliazione(adesso, [g]), [("verifica_invio", g)])
 
+    def test_riconciliazione_prepara_se_da_preparare(self):
+        adesso = datetime(2026, 9, 12, 8, 0, tzinfo=timezone.utc)
+        g = G(DA_PREPARARE, datetime(2026, 9, 12, 14, 30, tzinfo=timezone.utc))
+        self.assertEqual(scheduler.azioni_riconciliazione(adesso, [g]), [("prepara", g)])
+
+    def test_riconciliazione_invia_a_ora_limite_esatta(self):
+        limite = datetime(2026, 9, 12, 14, 30, tzinfo=timezone.utc)
+        g = G(PROPOSTA, limite)
+        self.assertEqual(scheduler.azioni_riconciliazione(limite, [g]), [("invia", g)])
+
     def test_prossimo_heartbeat_oggi_o_domani(self):
         from zoneinfo import ZoneInfo
         tz = "Europe/Rome"
