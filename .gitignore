@@ -22,3 +22,13 @@ __pycache__/
 # Sistema
 .DS_Store
 *.bak
+
+# --- File di lavoro personali: solo locale, MAI pubblicati ---
+# Skill personalizzata con le preferenze reali (il template pubblico è in skill/)
+.claude/
+# Spec di design interni (contengono nome lega e nomi giocatori reali)
+docs/superpowers/
+# Roadmap/storico dettagliato con dati reali
+ROADMAP_autoformazione.md
+# Test che colpiscono gli endpoint reali (i test pubblici stanno in tests/)
+/test_*.py
