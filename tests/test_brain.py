@@ -41,7 +41,7 @@ class TestBrain(unittest.TestCase):
             return seq.pop(0)
         b = Brain("k", "m", rm=FakeRoster(), http_post=fake_post)
         spec = b.proponi("T", 4)
-        self.assertEqual(len(spec["titolari"]), 11)
+        self.assertEqual(spec, _spec_valido())
         self.assertEqual(seq, [])  # ha consumato entrambe: 1 invalida + 1 valida
 
     def test_errore_dopo_max_tentativi(self):
@@ -62,6 +62,14 @@ class TestBrain(unittest.TestCase):
         corpo = json.dumps(catturato["body"])
         self.assertIn("352", corpo)
         self.assertIn("A3", corpo)
+        self.assertIn("343", corpo)  # modulo dello spec precedente nel body
+
+    def test_errore_su_candidates_vuoti(self):
+        def fake_post(url, headers, body):
+            return {"candidates": []}
+        b = Brain("k", "m", max_tentativi=2, rm=FakeRoster(), http_post=fake_post)
+        with self.assertRaises(BrainError):
+            b.proponi("T", 4)
 
 if __name__ == "__main__":
     unittest.main()

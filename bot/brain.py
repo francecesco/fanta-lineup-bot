@@ -45,6 +45,8 @@ class Brain:
                    "User-Agent": "fanta-lineup-bot/1.0",
                    "x-goog-api-key": self.api_key}
         resp = self.http_post(self._url(), headers, json.dumps(payload).encode())
+        if not resp.get("candidates"):
+            raise ValueError("risposta Gemini senza candidates")
         cand = resp["candidates"][0]
         return "".join(pt.get("text", "") for pt in cand["content"]["parts"])
 
@@ -56,8 +58,8 @@ class Brain:
         return json.loads(testo[i:j + 1])
 
     def _valida(self, spec, cmday):
-        """Ritorna lo spec validato, oppure solleva ValueError con il motivo."""
-        payload = bp.build_payload(dict(spec, cmday=cmday), rm=self.rm)  # solleva ValidationError
+        """Ritorna lo spec se valido, altrimenti propaga ValidationError/ValueError."""
+        bp.build_payload(dict(spec, cmday=cmday), rm=self.rm)  # solleva ValidationError se invalido
         return spec
 
     def _cicla(self, system, primo_user, cmday):
