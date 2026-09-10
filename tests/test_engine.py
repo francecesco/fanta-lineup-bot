@@ -17,9 +17,10 @@ class FakeBrain:
     def modifica(self, spec, richiesta, tabella, cmday): return dict(self.spec, modulo="352")
 
 class FakeNotifier:
-    def __init__(self): self.mandati, self.aggiornati, self.attese = [], [], []
+    def __init__(self): self.mandati, self.aggiornati, self.attese, self.messaggi = [], [], [], []
     def manda_proposta(self, g, spec, testo): self.mandati.append((g, spec)); return "msg1"
     def aggiorna_messaggio(self, msg_id, testo): self.aggiornati.append((msg_id, testo))
+    def manda_messaggio(self, testo): self.messaggi.append(testo); return "msgX"
     def chiedi_testo_modifica(self, g): self.attese.append(g)
     def poll_eventi(self): return []
 
@@ -51,7 +52,7 @@ class TestEngine(unittest.TestCase):
         self.store.crea_se_assente(700047, 4, ORA)
         e.prepara(700047, 4, {"lineUpInfo": []}, ORA)
         self.assertEqual(self.store.get(700047, 4).stato, ERRORE)
-        self.assertTrue(self.notif.aggiornati or True)  # ha avvisato
+        self.assertEqual(len(self.notif.messaggi), 1)  # l'utente è stato avvisato pur senza msg_id
 
     def test_blocca_non_invia(self):
         e = self._engine()
@@ -98,6 +99,30 @@ class TestEngine(unittest.TestCase):
         g = self.store.get(700047, 4)
         self.assertEqual(g.stato, PROPOSTA)
         self.assertEqual(g.spec["modulo"], "352")
+
+    def test_invia_ora_lock_una_volta_sola(self):
+        chiamate = []
+        e = self._engine(invia_fn=lambda *a: chiamate.append(1) or {"mdl": "343", "verificato": True})
+        self.store.crea_se_assente(700047, 4, ORA)
+        e.prepara(700047, 4, {"lineUpInfo": []}, ORA)
+        e._provider = prov_ok
+        e.invia_ora(700047, 4)
+        e.invia_ora(700047, 4)   # lock già preso: NON invia di nuovo
+        self.assertEqual(len(chiamate), 1)
+
+    def test_modifica_brainerror_mantiene_proposta(self):
+        class BrainModErr(FakeBrain):
+            def modifica(self, spec, richiesta, tabella, cmday):
+                raise BrainError("boom")
+        e = self._engine(brain=BrainModErr())
+        self.store.crea_se_assente(700047, 4, ORA)
+        e.prepara(700047, 4, {"lineUpInfo": []}, ORA)
+        spec_prima = self.store.get(700047, 4).spec
+        e.on_evento(Evento("modifica", 700047, 4), prov_ok)
+        e.on_evento(Evento("modifica_testo", 700047, 4, "cambia tutto"), prov_ok)
+        g = self.store.get(700047, 4)
+        self.assertEqual(g.stato, PROPOSTA)      # torna a PROPOSTA con la vecchia proposta
+        self.assertEqual(g.spec, spec_prima)     # spec invariato
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,6 +2,7 @@
 from bot import giornata as gio
 from bot.brain import BrainError
 from bot.invio import InvioError
+from bot.state import PROPOSTA
 
 class Engine:
     def __init__(self, store, brain, notifier, invia_fn, rm, settings):
@@ -40,8 +41,11 @@ class Engine:
 
     def _avvisa_errore(self, idcomp, cmday, dettaglio):
         g = self.store.get(idcomp, cmday)
+        testo = self._testo_esito("ERRORE", dettaglio)
         if g and g.msg_id:
-            self.notifier.aggiorna_messaggio(g.msg_id, self._testo_esito("ERRORE", dettaglio))
+            self.notifier.aggiorna_messaggio(g.msg_id, testo)
+        else:
+            self.notifier.manda_messaggio(testo)
 
     def on_evento(self, ev, provider=None):
         if provider:
@@ -79,7 +83,7 @@ class Engine:
         if not self.store.prova_lock_invio(idcomp, cmday):
             return  # già in invio / non più in PROPOSTA
         g = self.store.get(idcomp, cmday)
-        res, session, _ora = self._provider()
+        _res, session, _ora = self._provider()
         try:
             self.invia_fn(g.spec, cmday, session, self.rm)
         except InvioError as e:
@@ -90,7 +94,6 @@ class Engine:
         self.notifier.aggiorna_messaggio(g.msg_id, self._testo_esito("INVIATA"))
 
     def scaduto(self, idcomp, cmday):
-        from bot.state import PROPOSTA
         g = self.store.get(idcomp, cmday)
         if g and g.stato == PROPOSTA:
             self.invia_ora(idcomp, cmday)

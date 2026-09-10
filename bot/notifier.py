@@ -18,6 +18,8 @@ class Notifier(ABC):
     @abstractmethod
     def aggiorna_messaggio(self, msg_id, testo): ...
     @abstractmethod
+    def manda_messaggio(self, testo): ...
+    @abstractmethod
     def chiedi_testo_modifica(self, giornata): ...
     @abstractmethod
     def poll_eventi(self): ...
@@ -61,6 +63,11 @@ class TelegramNotifier(Notifier):
     def aggiorna_messaggio(self, msg_id, testo):
         self._post("editMessageText", {
             "chat_id": self.chat_id, "message_id": msg_id, "text": testo, "parse_mode": "HTML"})
+
+    def manda_messaggio(self, testo):
+        res = self._post("sendMessage", {
+            "chat_id": self.chat_id, "text": testo, "parse_mode": "HTML"})
+        return str(res["result"]["message_id"])
 
     def chiedi_testo_modifica(self, giornata):
         self._attesa_modifica = (giornata["idcomp"], giornata["cmday"])
