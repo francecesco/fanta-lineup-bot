@@ -90,3 +90,20 @@ class Brain:
                 f"Modifica richiesta dall'utente: {richiesta}\n"
                 f"Applica la modifica mantenendo la formazione valida. Chiudi con il solo JSON.")
         return self._cicla(_SYSTEM, user, cmday)
+
+    def calendario(self, cmday, squadre):
+        elenco = ", ".join(squadre)
+        system = ("Restituisci il calendario ufficiale della giornata di Serie A richiesta. "
+                  "Cerca su Google gli orari esatti. Rispondi con SOLO un array JSON, un elemento "
+                  'per squadra richiesta: [{"squadra":"<nome>","kickoff":"YYYY-MM-DDTHH:MM"}]. '
+                  "Orari in fuso Europe/Rome, senza testo attorno.")
+        user = f"Giornata {cmday} di Serie A. Squadre che mi interessano: {elenco}."
+        testo = self._genera(system, user)
+        i, j = testo.find("["), testo.rfind("]")
+        if i < 0 or j < 0:
+            return []
+        try:
+            dati = json.loads(testo[i:j + 1])
+            return [d for d in dati if isinstance(d, dict) and "squadra" in d and "kickoff" in d]
+        except ValueError:
+            return []
