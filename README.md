@@ -135,6 +135,7 @@ Con `.env`, `config.py` e i due file `.xlsx` (rosa e listone quotazioni) già pr
 cartella del progetto (vedi sezione [Setup](#setup) sopra):
 
 ```bash
+touch bot.db   # crea il file del DB prima del primo avvio, così il volume monta un file e non una cartella
 docker compose up -d --build
 docker compose logs -f
 ```
