@@ -1,6 +1,5 @@
 import unittest
-from datetime import datetime, timedelta, timezone
-from bot import state
+from datetime import datetime, timezone
 from bot.state import Store, DA_PREPARARE, PROPOSTA, BLOCCATA, INVIATA
 
 SPEC = {"modulo": "343", "titolari": ["A"] * 11, "panchina": ["B"] * 12, "capitano": []}

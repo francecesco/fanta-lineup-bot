@@ -81,10 +81,13 @@ class Store:
         esistente = self.get(idcomp, cmday)
         if esistente:
             return esistente, False
-        self.db.execute(
-            "INSERT INTO giornate (idcomp, cmday, stato, ora_limite, updated_at) VALUES (?,?,?,?,?)",
-            (idcomp, cmday, DA_PREPARARE, _iso(ora_limite), now_rome().isoformat()))
-        self.db.commit()
+        try:
+            self.db.execute(
+                "INSERT INTO giornate (idcomp, cmday, stato, ora_limite, updated_at) VALUES (?,?,?,?,?)",
+                (idcomp, cmday, DA_PREPARARE, _iso(ora_limite), now_rome().isoformat()))
+            self.db.commit()
+        except sqlite3.IntegrityError:
+            return self.get(idcomp, cmday), False
         self.log(idcomp, cmday, "creata")
         return self.get(idcomp, cmday), True
 
@@ -95,7 +98,7 @@ class Store:
             (PROPOSTA, json.dumps(spec), msg_id, _iso(ora_limite),
              now_rome().isoformat(), idcomp, cmday))
         self.db.commit()
-        self.log(idcomp, cmday, "proposta", spec.get("modulo", ""))
+        self.log(idcomp, cmday, "proposta", spec.get("modulo", "") if spec else "")
 
     def set_in_modifica(self, idcomp, cmday):
         self.db.execute(
@@ -138,8 +141,9 @@ class Store:
         self.log(idcomp, cmday, "errore", msg)
 
     def non_terminali(self):
+        ph = ",".join("?" * len(TERMINALI))
         rows = self.db.execute(
-            "SELECT * FROM giornate WHERE stato NOT IN (?,?)", (BLOCCATA, INVIATA)).fetchall()
+            f"SELECT * FROM giornate WHERE stato NOT IN ({ph})", tuple(TERMINALI)).fetchall()
         return [self._row2g(r) for r in rows]
 
     def chiudi(self):
