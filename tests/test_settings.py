@@ -1,4 +1,5 @@
 import os, tempfile, unittest
+import config
 from bot.settings import carica_settings, Settings
 
 class TestSettings(unittest.TestCase):
@@ -22,7 +23,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(s.gemini_model, "gemini-3.6-flash")
         self.assertEqual(s.buffer_invio_min, 30)          # default
         self.assertEqual(s.ora_heartbeat, "08:00")        # default
-        self.assertIn(s.lega["idcomp"], (s.lega["idcomp"],))  # presa da config.LEGA
+        self.assertEqual(s.lega["idcomp"], config.LEGA["idcomp"])
 
     def test_manca_un_segreto_errore_chiaro(self):
         env = self._env(["FANTA_USER=cesco"])  # mancano gli altri
