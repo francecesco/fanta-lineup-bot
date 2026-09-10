@@ -26,8 +26,8 @@ def secondi_a(adesso, target):
     return max(0.0, (target - adesso).total_seconds())
 
 def run_loop(engine, store, settings, provider, stop_event=None):
-    """Loop always-on. provider() -> callable che fa login+get_lineup freschi (chiamata
-    dall'engine, non dallo scheduler stesso).
+    """Loop always-on. `provider` è una callable () -> (res, session, ora_limite) che fa
+    login+get_lineup freschi: viene passata così com'è all'engine, che la invoca quando serve.
     NB: descritto per l'esecuzione reale; le decisioni sono testate nelle funzioni pure sopra."""
     tz = settings.tz
     def adesso():
