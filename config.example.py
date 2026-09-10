@@ -34,3 +34,15 @@ PANCHINA_FISSA = True   # fbench: con panchina fissa servono ESATTAMENTE MAX_PAN
 # File dati (relativi alla cartella del progetto)
 FILE_QUOTAZIONI = "Quotazioni.xlsx"
 FILE_ROSA = "rosa.xlsx"
+
+# --- Bot autonomo (Zimaboard) ---
+ORA_HEARTBEAT = "08:00"          # ogni mattina il bot controlla se oggi si gioca
+BUFFER_INVIO_MIN = 30            # invia N minuti prima del primo kickoff dei tuoi
+MAX_TENTATIVI_GEMINI = 3         # tentativi di ottenere uno spec valido da Gemini
+GEMINI_MODEL = "gemini-3.6-flash"
+TZ_BOT = "Europe/Rome"
+DB_PATH = "bot.db"
+# Cutoff di sicurezza per giorno (0=lun..6=dom): ora oltre cui non si invia,
+# usato se il calendario reale non è disponibile.
+CUTOFF_FALLBACK = {0: "18:15", 1: "18:15", 2: "18:15", 3: "18:15",
+                   4: "18:15", 5: "12:15", 6: "12:15"}
