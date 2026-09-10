@@ -28,7 +28,16 @@ class TestGiornata(unittest.TestCase):
 
     def test_squadre_utente_deduplicate_reali(self):
         sq = giornata.squadre_utente(RES)
-        self.assertEqual(set(sq), {"Juventus", "Fiorentina", "Inter"})
+        self.assertEqual(sq, ["Juventus", "Fiorentina", "Inter"])
+
+    def test_role_scalare(self):
+        res = {"teamLineupDto": {"cmday": 4},
+               "lineUpInfo": [{"role": 2, "plyr": "Bastoni", "tname": "Inter",
+                               "teamH": "INT", "teamA": "TOR", "hoaw": 0,
+                               "percent": 80, "status": 1, "agrd": 6.0, "fagrd": 6.0}]}
+        t = giornata.tabella_rosa(res)
+        self.assertIn("Bastoni", t)
+        self.assertTrue(t.startswith("D "))   # role scalare 2 -> "D"
 
 if __name__ == "__main__":
     unittest.main()
