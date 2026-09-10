@@ -1,0 +1,24 @@
+# Segreti / credenziali — MAI committare
+.env
+
+# Config con i tuoi identificativi di lega
+config.py
+
+# Spec formazione reale (usa formazione.example.json come modello)
+formazione.json
+
+# File dati personali (rosa, listone quotazioni, piani/strategie)
+*.xlsx
+*.xls
+
+# Cattura di rete: contiene password e token in chiaro
+*.har
+
+# Ambiente Python
+.venv/
+__pycache__/
+*.pyc
+
+# Sistema
+.DS_Store
+*.bak

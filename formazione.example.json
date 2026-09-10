@@ -1,0 +1,15 @@
+{
+  "_commento": "Esempio di spec formazione. I nomi devono combaciare ESATTAMENTE con la colonna Giocatore di rosa.xlsx. mday/cmday non servono: li legge lo strumento dal sito.",
+  "modulo": "343",
+  "titolari": [
+    "<Portiere>",
+    "<Difensore 1>", "<Difensore 2>", "<Difensore 3>",
+    "<Centrocampista 1>", "<Centrocampista 2>", "<Centrocampista 3>", "<Centrocampista 4>",
+    "<Attaccante 1>", "<Attaccante 2>", "<Attaccante 3>"
+  ],
+  "panchina": [
+    "<Riserva 1>", "<Riserva 2>", "<Riserva 3>", "<Riserva 4>", "<Riserva 5>", "<Riserva 6>",
+    "<Riserva 7>", "<Riserva 8>", "<Riserva 9>", "<Riserva 10>", "<Riserva 11>", "<Riserva 12>"
+  ],
+  "capitano": []
+}
