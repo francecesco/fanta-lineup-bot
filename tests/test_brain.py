@@ -71,5 +71,28 @@ class TestBrain(unittest.TestCase):
         with self.assertRaises(BrainError):
             b.proponi("T", 4)
 
+class TestBrainCalendario(unittest.TestCase):
+    def _brain(self, testo):
+        def fake_post(url, headers, body):
+            return {"candidates": [{"content": {"parts": [{"text": testo}]}}]}
+        return Brain("k", "m", rm=FakeRoster(), http_post=fake_post)
+
+    def test_calendario_happy(self):
+        b = self._brain('Ecco il calendario: '
+                        '[{"squadra":"Inter","kickoff":"2026-09-12T20:45"},'
+                        '{"squadra":"Juventus","kickoff":"2026-09-12T15:00"}]')
+        cal = b.calendario(4, ["Inter", "Juventus"])
+        self.assertEqual(len(cal), 2)
+        self.assertEqual(cal[0]["squadra"], "Inter")
+
+    def test_calendario_json_illeggibile_ritorna_vuoto(self):
+        b = self._brain("nessun array JSON qui")
+        self.assertEqual(b.calendario(4, ["Inter"]), [])
+
+    def test_calendario_filtra_voci_malformate(self):
+        b = self._brain('[{"squadra":"Inter","kickoff":"2026-09-12T20:45"}, {"foo":1}, "x"]')
+        cal = b.calendario(4, ["Inter"])
+        self.assertEqual(cal, [{"squadra": "Inter", "kickoff": "2026-09-12T20:45"}])
+
 if __name__ == "__main__":
     unittest.main()

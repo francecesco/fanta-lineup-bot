@@ -14,7 +14,7 @@ def calendario_valido(calendario, adesso, giorni_max=10, tz="Europe/Rome"):
     for m in calendario:
         try:
             k = _parse(m["kickoff"], tz)
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError):
             return False
         if k < adesso or k > adesso + timedelta(days=giorni_max):
             return False
