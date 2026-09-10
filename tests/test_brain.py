@@ -1,0 +1,67 @@
+import json, unittest
+from bot.brain import Brain, BrainError
+
+# Fake RosterMap: accetta un insieme fisso di nomi/ruoli, come build_payload si aspetta.
+class FakeRoster:
+    RUOLI = {**{f"P{i}": "P" for i in range(3)}, **{f"D{i}": "D" for i in range(8)},
+             **{f"C{i}": "C" for i in range(8)}, **{f"A{i}": "A" for i in range(6)}}
+    def resolve(self, nome, require_owned=True):
+        if nome not in self.RUOLI:
+            raise ValueError(f"'{nome}' non è nella tua rosa")
+        # build_payload usa `pid, role = rm.resolve(n)`: resolve ritorna una tupla (id, ruolo).
+        return (abs(hash(nome)) % 100000, self.RUOLI[nome])
+
+def _spec_valido():
+    tit = ["P0"] + [f"D{i}" for i in range(3)] + [f"C{i}" for i in range(4)] + [f"A{i}" for i in range(3)]
+    panca = ["P1", "P2"] + [f"D{i}" for i in range(3, 8)] + [f"C{i}" for i in range(4, 8)] + ["A3"]
+    return {"modulo": "343", "titolari": tit, "panchina": panca, "capitano": []}
+
+def _risposta_gemini(spec):
+    testo = "Ragionamento...\n" + json.dumps(spec)
+    return {"candidates": [{"content": {"parts": [{"text": testo}]},
+                            "groundingMetadata": {"webSearchQueries": ["probabili giornata 4"]}}]}
+
+class TestBrain(unittest.TestCase):
+    def test_proponi_valido_al_primo_colpo(self):
+        chiamate = []
+        def fake_post(url, headers, body):
+            chiamate.append(json.loads(body))
+            return _risposta_gemini(_spec_valido())
+        b = Brain("k", "gemini-3.6-flash", rm=FakeRoster(), http_post=fake_post)
+        spec = b.proponi("TABELLA", 4)
+        self.assertEqual(spec["modulo"], "343")
+        self.assertEqual(len(chiamate), 1)
+        # il tool google_search è nel corpo della richiesta
+        self.assertIn("google_search", json.dumps(chiamate[0]))
+
+    def test_proponi_riprova_su_spec_invalido(self):
+        invalido = dict(_spec_valido(), titolari=["P0"] * 11)  # 11 portieri: reparti incoerenti
+        seq = [_risposta_gemini(invalido), _risposta_gemini(_spec_valido())]
+        def fake_post(url, headers, body):
+            return seq.pop(0)
+        b = Brain("k", "m", rm=FakeRoster(), http_post=fake_post)
+        spec = b.proponi("T", 4)
+        self.assertEqual(len(spec["titolari"]), 11)
+        self.assertEqual(seq, [])  # ha consumato entrambe: 1 invalida + 1 valida
+
+    def test_errore_dopo_max_tentativi(self):
+        invalido = dict(_spec_valido(), titolari=["P0"] * 11)
+        def fake_post(url, headers, body):
+            return _risposta_gemini(invalido)
+        b = Brain("k", "m", max_tentativi=3, rm=FakeRoster(), http_post=fake_post)
+        with self.assertRaises(BrainError):
+            b.proponi("T", 4)
+
+    def test_modifica_passa_richiesta_e_spec_precedente(self):
+        catturato = {}
+        def fake_post(url, headers, body):
+            catturato["body"] = json.loads(body)
+            return _risposta_gemini(_spec_valido())
+        b = Brain("k", "m", rm=FakeRoster(), http_post=fake_post)
+        b.modifica(_spec_valido(), "gioca il 352 con A3 titolare", "T", 4)
+        corpo = json.dumps(catturato["body"])
+        self.assertIn("352", corpo)
+        self.assertIn("A3", corpo)
+
+if __name__ == "__main__":
+    unittest.main()
