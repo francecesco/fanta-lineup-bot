@@ -1,3 +1,5 @@
 # Solo per leggere i file .xlsx (rosa e listone quotazioni).
 # fanta_api.py e build_payload.py usano solo la libreria standard.
+# Anche il bot (bot/) è stdlib puro (incluso il client Telegram, via urllib):
+# openpyxl serve solo a RosterMap per leggere gli .xlsx.
 openpyxl>=3.1

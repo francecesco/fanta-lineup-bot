@@ -1,0 +1,13 @@
+services:
+  bot:
+    build: .
+    restart: always
+    env_file: .env
+    environment:
+      TZ: Europe/Rome
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./config.py:/app/config.py:ro
+      - ./rosa.xlsx:/app/rosa.xlsx:ro
+      - ./Quotazioni_Fantacalcio_Stagione_2026_27.xlsx:/app/Quotazioni_Fantacalcio_Stagione_2026_27.xlsx:ro
+      - ./bot.db:/app/bot.db

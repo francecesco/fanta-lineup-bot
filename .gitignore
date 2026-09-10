@@ -14,6 +14,9 @@ formazione.json
 # Cattura di rete: contiene password e token in chiaro
 *.har
 
+# Database del bot (stato delle giornate): dati personali, locale al deploy
+bot.db
+
 # Ambiente Python
 .venv/
 __pycache__/

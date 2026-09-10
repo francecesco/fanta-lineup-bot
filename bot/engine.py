@@ -102,6 +102,7 @@ class Engine:
             self.invia_ora(idcomp, cmday)
 
     def heartbeat(self, provider, oggi_iso=None):
+        self._provider = provider
         tz = self.settings.tz
         oggi = date.fromisoformat(oggi_iso) if oggi_iso else datetime.now(ZoneInfo(tz)).date()
         adesso = datetime.combine(oggi, time(0, 0), ZoneInfo(tz))  # inizio giornata: i kickoff odierni sono "futuri"

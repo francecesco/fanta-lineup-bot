@@ -93,6 +93,60 @@ python3 tests/test_build_payload.py   # autonomo, senza rete né dati personali
 undici, panchina) e nel blocco JSON pronto per `invia_formazione.py`. La sezione
 **Preferenze** è pensata per essere personalizzata (approccio, giocatori intoccabili, ecc.).
 
+## Bot autonomo (Zimaboard)
+
+Oltre al flusso manuale (`stato_giornata.py` + `invia_formazione.py`), il progetto include un
+bot always-on pensato per girare su un piccolo server sempre acceso (es. una Zimaboard) dentro
+`bot/`. Il bot:
+
+- ogni giorno, a un orario configurabile (`ora_heartbeat`), controlla se oggi giocano le tue
+  squadre; se sì, calcola l'`ora_limite` di invio dal calendario reale (con un cutoff di
+  sicurezza se il sito non espone l'orario) e prepara una **proposta di formazione**
+  (modulo, undici, panchina) usando la skill/il cervello Gemini
+- manda la proposta sul canale configurato (vedi sotto) con tre azioni: **❌ blocca** (non
+  invia, la sistemi a mano sul sito), **✏️ modifica** (scrivi in una frase cosa cambiare, il
+  bot ripropone), **✅ conferma** (invia subito)
+- se non intervieni, **invia automaticamente** la formazione proposta all'`ora_limite`
+  (auto-invio con veto: puoi sempre fermarlo o correggerlo prima che scada il tempo)
+- riconcilia lo stato a ogni riavvio (giornate lasciate a metà, invii da verificare) così è
+  sicuro riavviare il container in qualsiasi momento
+- è idempotente: ogni giornata viene preparata e inviata una sola volta, anche in caso di
+  riavvii o crash a metà
+
+Il canale di notifica è astratto (`bot/notifier.py`, classe base `Notifier`): oggi è
+implementato solo **Telegram** (`TelegramNotifier`); un canale WhatsApp/`open-wa` è sulla
+roadmap e si aggiungerebbe come nuova implementazione della stessa interfaccia, senza toccare
+il resto del bot.
+
+### Setup Telegram
+
+1. Crea un bot parlando con **[@BotFather](https://t.me/BotFather)** su Telegram: comando
+   `/newbot`, scegli nome e username; BotFather ti restituisce un **token** (va in
+   `TELEGRAM_BOT_TOKEN` nel tuo `.env`, non committarlo mai).
+2. Scrivi un messaggio qualsiasi al tuo bot (deve essere lui a scriverti, quindi inizia tu la
+   conversazione), poi apri nel browser:
+   `https://api.telegram.org/bot<TOKEN>/getUpdates`
+   e leggi `message.chat.id` dalla risposta JSON: è il tuo `chat_id` (va in
+   `TELEGRAM_CHAT_ID` nel tuo `.env`). Il bot risponde solo a messaggi da questo `chat_id`.
+
+### Avvio con Docker
+
+Con `.env`, `config.py` e i due file `.xlsx` (rosa e listone quotazioni) già pronti nella
+cartella del progetto (vedi sezione [Setup](#setup) sopra):
+
+```bash
+docker compose up -d --build
+docker compose logs -f
+```
+
+Il container si riavvia da solo (`restart: always`) e alla partenza riconcilia lo stato
+salvato in `bot.db` (montato come volume, così sopravvive ai riavvii del container).
+
+Per fermarlo:
+```bash
+docker compose down
+```
+
 ## Sicurezza
 
 - `.env` (credenziali), `config.py` (i tuoi ID), i file `.xlsx` e gli `.har` sono in `.gitignore`:

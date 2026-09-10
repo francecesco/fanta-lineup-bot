@@ -43,5 +43,27 @@ class TestScheduler(unittest.TestCase):
         hb2 = scheduler.prossimo_heartbeat(adesso2, "08:00", tz)
         self.assertEqual(hb2.day, 13)  # già passato oggi → domani
 
+    def test_run_loop_passa_provider_callable(self):
+        import threading
+        from bot.state import Giornata, DA_PREPARARE
+        ricevuti = {}
+        class _N:
+            def poll_eventi(self): return []
+        class FakeEngine:
+            notifier = _N()
+            def on_evento_riconcilia(self, tipo, g, provider): ricevuti["provider"] = provider
+            def heartbeat(self, provider): pass
+            def scaduto(self, *a): pass
+            def on_evento(self, *a): pass
+        class FakeStore:
+            def non_terminali(self):
+                return [Giornata(1, 1, DA_PREPARARE, None, None, None, None, None, "")]
+        class S:
+            tz = "Europe/Rome"; ora_heartbeat = "08:00"
+        prov = lambda: ("res", "sess", None)
+        ev = threading.Event(); ev.set()
+        scheduler.run_loop(FakeEngine(), FakeStore(), S(), prov, stop_event=ev)
+        self.assertTrue(callable(ricevuti.get("provider")))   # NON una tupla
+
 if __name__ == "__main__":
     unittest.main()

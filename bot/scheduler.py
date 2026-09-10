@@ -25,8 +25,9 @@ def prossimo_heartbeat(adesso, ora_heartbeat, tz):
 def secondi_a(adesso, target):
     return max(0.0, (target - adesso).total_seconds())
 
-def run_loop(engine, store, settings, provider_factory, stop_event=None):
-    """Loop always-on. provider_factory() -> callable che fa login+get_lineup freschi.
+def run_loop(engine, store, settings, provider, stop_event=None):
+    """Loop always-on. provider() -> callable che fa login+get_lineup freschi (chiamata
+    dall'engine, non dallo scheduler stesso).
     NB: descritto per l'esecuzione reale; le decisioni sono testate nelle funzioni pure sopra."""
     tz = settings.tz
     def adesso():
@@ -34,17 +35,16 @@ def run_loop(engine, store, settings, provider_factory, stop_event=None):
 
     # 1) Riconciliazione all'avvio
     for tipo, g in azioni_riconciliazione(adesso(), store.non_terminali()):
-        provider = provider_factory()
         engine.on_evento_riconcilia(tipo, g, provider)
 
     prossimo_hb = prossimo_heartbeat(adesso(), settings.ora_heartbeat, tz)
     while not (stop_event and stop_event.is_set()):
         # 2) poll eventi Telegram (non blocca a lungo: getUpdates ha timeout server-side)
         for ev in engine.notifier.poll_eventi():
-            engine.on_evento(ev, provider_factory())
+            engine.on_evento(ev, provider)
         # 3) heartbeat giornaliero
         if adesso() >= prossimo_hb:
-            engine.heartbeat(provider_factory())
+            engine.heartbeat(provider)
             prossimo_hb = prossimo_heartbeat(adesso(), settings.ora_heartbeat, tz)
         # 4) timer d'invio: se una PROPOSTA ha superato l'ora_limite, invia
         for tipo, g in azioni_riconciliazione(adesso(), store.non_terminali()):
