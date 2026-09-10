@@ -18,6 +18,9 @@ panchina, e **carica la formazione** sul sito via API — senza browser.
 - **Robusto ai token scaduti**: ri-login automatico su `401`
 - Include una **skill** (prompt) che, a partire dalla rosa e dai dati del sito, propone modulo,
   undici e panchina e produce lo `spec` JSON pronto da inviare
+- **Modalità bot autonomo** (`bot/`): un servizio always-on (es. su una Zimaboard) che ogni giorno
+  prepara la formazione con Gemini, te la propone su Telegram e la **invia da solo** prima del
+  deadline se non intervieni (auto-invio con veto). Vedi [Bot autonomo](#bot-autonomo-zimaboard).
 
 ## Come funziona (pipeline)
 
@@ -36,9 +39,13 @@ rosa.xlsx + listone quotazioni
 
 ## Requisiti
 
-- Python 3.9+
-- `openpyxl` (solo per leggere gli `.xlsx`): `pip install -r requirements.txt`
-  - `fanta_api.py` e `build_payload.py` usano solo la libreria standard.
+- **Python 3.12+** (il bot autonomo usa `zoneinfo` e type hints moderni; il flusso manuale gira
+  anche su 3.9+).
+- `pip install -r requirements.txt` — installa `openpyxl` (lettura `.xlsx`) e `tzdata` (database
+  fusi orari per il bot). `fanta_api.py` e `build_payload.py` usano solo la libreria standard.
+- Solo per il **bot autonomo**: una **API key Gemini** (Google AI Studio, gratuita) in
+  `GEMINI_API_KEY` e un **bot Telegram** (token + chat id) — vedi
+  [Bot autonomo](#bot-autonomo-zimaboard).
 
 ## Setup
 
@@ -52,7 +59,7 @@ cd fanta-lineup-bot
 pip install -r requirements.txt
 
 # 1) credenziali del sito (mai committare .env)
-cp .env.example .env        # poi inserisci FANTA_USER e FANTA_PWD
+cp .env.example .env        # FANTA_USER e FANTA_PWD (+ GEMINI_API_KEY e TELEGRAM_* se usi il bot)
 
 # 2) identificativi della tua lega (mai committare config.py)
 cp config.example.py config.py   # poi inserisci id_squadra e idcomp
@@ -166,6 +173,10 @@ invia_formazione.py     flusso completo di invio
 config.example.py       template di configurazione della lega
 formazione.example.json esempio di spec formazione
 skill/                  prompt (SKILL.md) + lettura rosa (rosa.sh, leggi_rosa.py)
+bot/                    bot autonomo always-on: settings, state (SQLite), giornata, brain (Gemini),
+                        orari, invio, notifier (Telegram), engine, scheduler, main
+Dockerfile              immagine del bot
+docker-compose.yml      deploy del bot (restart: always, volumi, timezone)
 tests/                  test autonomi
-docs/                   note tecniche (endpoint, payload, auth)
+docs/                   note tecniche (endpoint, payload, auth) + guida di replica
 ```

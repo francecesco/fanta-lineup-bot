@@ -150,6 +150,81 @@ python3 tests/test_build_payload.py
 
 ---
 
+## 9. (Opzionale) Bot autonomo su un server sempre acceso
+
+Oltre al flusso manuale, il progetto include un bot always-on (cartella `bot/`) che ogni giorno
+prepara la formazione, la propone su Telegram e la **invia da solo** prima del deadline se non
+intervieni (**auto-invio con veto**). Pensato per un piccolo server sempre acceso (Zimaboard,
+Raspberry, ...) via Docker.
+
+### 9.1 Chiave Gemini (il ragionamento del bot)
+
+Il bot sceglie la formazione con **Gemini** + ricerca Google (il flusso manuale usa invece la skill).
+Crea una API key gratuita su [Google AI Studio](https://aistudio.google.com/apikey) e mettila in
+`GEMINI_API_KEY` nel `.env` (mai committarla). Modello di default: `gemini-3.6-flash`
+(configurabile con `GEMINI_MODEL`).
+
+### 9.2 Bot Telegram (canale di proposta e veto)
+
+1. Parla con [@BotFather](https://t.me/BotFather), comando `/newbot`: ottieni un **token** →
+   `TELEGRAM_BOT_TOKEN` nel `.env`.
+2. Scrivi un messaggio al tuo bot, poi apri `https://api.telegram.org/bot<TOKEN>/getUpdates` e
+   leggi `message.chat.id` → `TELEGRAM_CHAT_ID` nel `.env`. Il bot risponde **solo** a questo chat.
+
+### 9.3 Parametri del bot (in `config.py`)
+
+`config.example.py` include i default; copiali in `config.py` se non ci sono:
+
+```python
+ORA_HEARTBEAT = "08:00"      # ogni mattina controlla se oggi giochi
+BUFFER_INVIO_MIN = 30        # invia N minuti prima del primo kickoff dei tuoi
+MAX_TENTATIVI_GEMINI = 3
+GEMINI_MODEL = "gemini-3.6-flash"
+TZ_BOT = "Europe/Rome"
+CUTOFF_FALLBACK = {0: "18:15", 1: "18:15", 2: "18:15", 3: "18:15",
+                   4: "18:15", 5: "12:15", 6: "12:15"}
+```
+
+### 9.4 Personalizza le preferenze del bot
+
+Il cervello Gemini segue le stesse preferenze della skill (approccio, scheletro fisso di titolari,
+mai infortunati, valuta l'avversario). Adattale al tuo stile nel *system prompt* di `bot/brain.py`
+(la costante `_SYSTEM`).
+
+### 9.5 Avvio con Docker
+
+Con `.env`, `config.py` e i due `.xlsx` (rosa e listone) pronti nella cartella del progetto:
+
+```bash
+touch bot.db                 # crea il file del DB prima del primo avvio: il volume monta un file, non una cartella
+docker compose up -d --build
+docker compose logs -f       # segui i log
+```
+
+Il container si riavvia da solo (`restart: always`) e alla partenza **riconcilia** lo stato salvato
+in `bot.db` (montato come volume, così sopravvive ai riavvii): è sicuro riavviarlo in qualsiasi
+momento. Senza Docker: `pip install -r requirements.txt` (serve **Python 3.12+**) e `python3 -m bot.main`.
+
+### 9.6 Come si comporta
+
+- **Ogni mattina** (`ORA_HEARTBEAT`) controlla se oggi giocano le tue squadre.
+- Se sì, prepara la formazione con Gemini e manda la proposta su Telegram con tre azioni:
+  **❌ Blocca** · **✏️ Modifica** (scrivi a parole cosa cambiare, il bot ripropone) ·
+  **✅ Conferma** (invia subito).
+- Se non intervieni, **invia in automatico** all'`ora_limite` (primo kickoff − `BUFFER_INVIO_MIN`).
+- **Idempotente**: ogni giornata è preparata e inviata una sola volta, anche con riavvii o crash.
+
+> ⚠️ **Prima volta**: fai un giro controllato e **non affidarti all'auto-invio** finché non hai visto
+> almeno una proposta corretta e testato i tre pulsanti.
+
+> ℹ️ **Limite noto**: l'orario del match non è esposto dal sito, quindi il bot lo ricava dal calendario
+> via Gemini. Prepara solo se il calendario è affidabile e il tuo primo kickoff è **oggi**; se in un
+> giorno-match Gemini non desse un calendario valido, quel giorno non prepara in automatico (puoi
+> sempre usare il flusso manuale). Miglioria possibile: una fonte match-day dedicata (es. l'endpoint
+> calendario di fantacalcio).
+
+---
+
 ## Adattare a leghe diverse
 
 - **Panchina non fissa** (`fbench: false`): imposta `PANCHINA_FISSA = False` in `config.py`.
