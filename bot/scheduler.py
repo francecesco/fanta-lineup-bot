@@ -1,13 +1,14 @@
 """Decisioni di scheduling (pure) + loop always-on del bot."""
+import logging
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from bot.state import PROPOSTA, DA_PREPARARE, INVIO_IN_CORSO
+from bot.state import PROPOSTA, DA_PREPARARE, INVIO_IN_CORSO, IN_MODIFICA
 
 def azioni_riconciliazione(adesso, giornate):
     azioni = []
     for g in giornate:
-        if g.stato == PROPOSTA and g.ora_limite and adesso >= g.ora_limite:
+        if g.stato in (PROPOSTA, IN_MODIFICA) and g.ora_limite and adesso >= g.ora_limite:
             azioni.append(("invia", g))
         elif g.stato == INVIO_IN_CORSO:
             azioni.append(("verifica_invio", g))
@@ -34,20 +35,26 @@ def run_loop(engine, store, settings, provider, stop_event=None):
         return datetime.now(ZoneInfo(tz))
 
     # 1) Riconciliazione all'avvio
-    for tipo, g in azioni_riconciliazione(adesso(), store.non_terminali()):
-        engine.on_evento_riconcilia(tipo, g, provider)
+    try:
+        for tipo, g in azioni_riconciliazione(adesso(), store.non_terminali()):
+            engine.on_evento_riconcilia(tipo, g, provider)
+    except Exception:
+        logging.exception("errore nella riconciliazione all'avvio")
 
     prossimo_hb = prossimo_heartbeat(adesso(), settings.ora_heartbeat, tz)
     while not (stop_event and stop_event.is_set()):
-        # 2) poll eventi Telegram (non blocca a lungo: getUpdates ha timeout server-side)
-        for ev in engine.notifier.poll_eventi():
-            engine.on_evento(ev, provider)
-        # 3) heartbeat giornaliero
-        if adesso() >= prossimo_hb:
-            engine.heartbeat(provider)
-            prossimo_hb = prossimo_heartbeat(adesso(), settings.ora_heartbeat, tz)
-        # 4) timer d'invio: se una PROPOSTA ha superato l'ora_limite, invia
-        for tipo, g in azioni_riconciliazione(adesso(), store.non_terminali()):
-            if tipo == "invia":
-                engine.scaduto(g.idcomp, g.cmday)
+        try:
+            # 2) poll eventi Telegram (non blocca a lungo: getUpdates ha timeout server-side)
+            for ev in engine.notifier.poll_eventi():
+                engine.on_evento(ev, provider)
+            # 3) heartbeat giornaliero
+            if adesso() >= prossimo_hb:
+                engine.heartbeat(provider)
+                prossimo_hb = prossimo_heartbeat(adesso(), settings.ora_heartbeat, tz)
+            # 4) timer d'invio: se una PROPOSTA ha superato l'ora_limite, invia
+            for tipo, g in azioni_riconciliazione(adesso(), store.non_terminali()):
+                if tipo == "invia":
+                    engine.scaduto(g.idcomp, g.cmday)
+        except Exception:
+            logging.exception("errore nel loop principale, continuo")
         time.sleep(5)

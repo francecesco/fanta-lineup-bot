@@ -5,9 +5,9 @@ _ORD = {"P": 0, "D": 1, "C": 2, "A": 3}
 def _role(p):
     r = p.get("role")
     r = r[0] if isinstance(r, list) and r else r
-    if r is None:
+    if not isinstance(r, int):
         return "?"
-    return RUOLO.get(int(r), "?")
+    return RUOLO.get(r, "?")
 
 def cmday(res: dict) -> int:
     return res["teamLineupDto"]["cmday"]

@@ -199,6 +199,25 @@ class TestEngine(unittest.TestCase):
         e.on_evento_riconcilia("verifica_invio", g, provider)
         self.assertEqual(self.store.get(700047, 4).stato, ERRORE)
 
+    def test_scaduto_invia_anche_da_in_modifica(self):
+        chiamate = []
+        e = self._engine(invia_fn=lambda *a: chiamate.append(1) or {"mdl": "343", "verificato": True})
+        self.store.crea_se_assente(700047, 4, ORA)
+        e.prepara(700047, 4, {"lineUpInfo": []}, ORA)
+        e._provider = prov_ok
+        e.on_evento(Evento("modifica", 700047, 4), prov_ok)   # -> IN_MODIFICA
+        e.scaduto(700047, 4)
+        self.assertEqual(len(chiamate), 1)
+        self.assertEqual(self.store.get(700047, 4).stato, INVIATA)
+
+    def test_invia_ora_mismatch_va_in_errore(self):
+        e = self._engine(invia_fn=lambda *a: {"mdl": "343", "verificato": False})
+        self.store.crea_se_assente(700047, 4, ORA)
+        e.prepara(700047, 4, {"lineUpInfo": []}, ORA)
+        e._provider = prov_ok
+        e.invia_ora(700047, 4)
+        self.assertEqual(self.store.get(700047, 4).stato, ERRORE)
+
     def test_riconcilia_invia(self):
         chiamate = []
         e = self._engine(invia_fn=lambda *a: chiamate.append(1) or {"mdl": "343", "verificato": True})

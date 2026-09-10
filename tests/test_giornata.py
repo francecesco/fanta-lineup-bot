@@ -39,5 +39,13 @@ class TestGiornata(unittest.TestCase):
         self.assertIn("Bastoni", t)
         self.assertTrue(t.startswith("D "))   # role scalare 2 -> "D"
 
+    def test_role_lista_vuota_non_crasha(self):
+        res = {"teamLineupDto": {"cmday": 4},
+               "lineUpInfo": [{"role": [], "plyr": "X", "tname": "Inter",
+                               "teamH": "INT", "teamA": "TOR", "hoaw": 0,
+                               "percent": 50, "status": 1, "agrd": 6, "fagrd": 6}]}
+        t = giornata.tabella_rosa(res)   # non deve sollevare
+        self.assertIn("X", t)
+
 if __name__ == "__main__":
     unittest.main()

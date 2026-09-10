@@ -5,7 +5,7 @@ from bot import giornata as gio
 from bot import orari
 from bot.brain import BrainError
 from bot.invio import InvioError
-from bot.state import PROPOSTA
+from bot.state import PROPOSTA, IN_MODIFICA
 
 class Engine:
     def __init__(self, store, brain, notifier, invia_fn, rm, settings):
@@ -83,22 +83,29 @@ class Engine:
         self.store.set_proposta(ev.idcomp, ev.cmday, spec, msg_id, ora_limite)
 
     def invia_ora(self, idcomp, cmday):
+        if self._provider is None:
+            return
         if not self.store.prova_lock_invio(idcomp, cmday):
-            return  # già in invio / non più in PROPOSTA
+            return  # già in invio / non più inviabile
         g = self.store.get(idcomp, cmday)
         _res, session, _ora = self._provider()
         try:
-            self.invia_fn(g.spec, cmday, session, self.rm)
+            esito = self.invia_fn(g.spec, cmday, session, self.rm)
         except InvioError as e:
             self.store.segna_errore(idcomp, cmday, str(e))
             self.notifier.aggiorna_messaggio(g.msg_id, self._testo_esito("ERRORE", str(e)))
             return
-        self.store.segna_inviata(idcomp, cmday)
-        self.notifier.aggiorna_messaggio(g.msg_id, self._testo_esito("INVIATA"))
+        if esito.get("verificato"):
+            self.store.segna_inviata(idcomp, cmday)
+            self.notifier.aggiorna_messaggio(g.msg_id, self._testo_esito("INVIATA"))
+        else:
+            msg = "inviata ma la verifica dal sito non torna (modulo diverso), controlla a mano"
+            self.store.segna_errore(idcomp, cmday, msg)
+            self.notifier.aggiorna_messaggio(g.msg_id, self._testo_esito("ERRORE", msg))
 
     def scaduto(self, idcomp, cmday):
         g = self.store.get(idcomp, cmday)
-        if g and g.stato == PROPOSTA:
+        if g and g.stato in (PROPOSTA, IN_MODIFICA):
             self.invia_ora(idcomp, cmday)
 
     def heartbeat(self, provider, oggi_iso=None):

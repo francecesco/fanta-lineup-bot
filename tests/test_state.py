@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone
-from bot.state import Store, DA_PREPARARE, PROPOSTA, BLOCCATA, INVIATA
+from bot.state import Store, DA_PREPARARE, PROPOSTA, BLOCCATA, INVIATA, IN_MODIFICA
 
 SPEC = {"modulo": "343", "titolari": ["A"] * 11, "panchina": ["B"] * 12, "capitano": []}
 
@@ -40,6 +40,12 @@ class TestStore(unittest.TestCase):
         self.assertTrue(self.s.blocca(700047, 4))
         self.assertFalse(self.s.prova_lock_invio(700047, 4))   # da BLOCCATA non si invia
         self.assertEqual(self.s.get(700047, 4).stato, BLOCCATA)
+
+    def test_lock_invio_da_in_modifica(self):
+        self.s.crea_se_assente(700047, 4, _ora())
+        self.s.set_proposta(700047, 4, SPEC, "m", _ora())
+        self.s.set_in_modifica(700047, 4)
+        self.assertTrue(self.s.prova_lock_invio(700047, 4))
 
     def test_non_terminali_esclude_inviata_e_bloccata(self):
         self.s.crea_se_assente(700047, 4, _ora())

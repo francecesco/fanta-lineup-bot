@@ -8,6 +8,7 @@ services:
     volumes:
       - ./.env:/app/.env:ro
       - ./config.py:/app/config.py:ro
+      # i nomi dei file .xlsx qui sotto devono corrispondere a FILE_ROSA / FILE_QUOTAZIONI in config.py
       - ./rosa.xlsx:/app/rosa.xlsx:ro
       - ./Quotazioni_Fantacalcio_Stagione_2026_27.xlsx:/app/Quotazioni_Fantacalcio_Stagione_2026_27.xlsx:ro
       # bot.db va pre-creato sull'host (touch bot.db) prima del primo avvio: se il file non

@@ -118,10 +118,10 @@ class Store:
         return ok
 
     def prova_lock_invio(self, idcomp, cmday):
-        """Lock atomico: solo un chiamante passa da PROPOSTA a INVIO_IN_CORSO."""
+        """Lock atomico: solo un chiamante passa da PROPOSTA/IN_MODIFICA a INVIO_IN_CORSO."""
         cur = self.db.execute(
-            "UPDATE giornate SET stato=?, updated_at=? WHERE idcomp=? AND cmday=? AND stato=?",
-            (INVIO_IN_CORSO, now_rome().isoformat(), idcomp, cmday, PROPOSTA))
+            "UPDATE giornate SET stato=?, updated_at=? WHERE idcomp=? AND cmday=? AND stato IN (?,?)",
+            (INVIO_IN_CORSO, now_rome().isoformat(), idcomp, cmday, PROPOSTA, IN_MODIFICA))
         self.db.commit()
         return cur.rowcount == 1
 

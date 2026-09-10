@@ -5,3 +5,8 @@ __pycache__/
 docs/
 tests/
 *.har
+.env
+config.py
+*.xlsx
+*.xls
+bot.db

@@ -33,6 +33,12 @@ class TestScheduler(unittest.TestCase):
         g = G(PROPOSTA, limite)
         self.assertEqual(scheduler.azioni_riconciliazione(limite, [g]), [("invia", g)])
 
+    def test_riconciliazione_invia_da_in_modifica_scaduta(self):
+        from bot.state import IN_MODIFICA
+        adesso = datetime(2026, 9, 12, 15, 0, tzinfo=timezone.utc)
+        g = G(IN_MODIFICA, datetime(2026, 9, 12, 14, 30, tzinfo=timezone.utc))
+        self.assertEqual(scheduler.azioni_riconciliazione(adesso, [g]), [("invia", g)])
+
     def test_prossimo_heartbeat_oggi_o_domani(self):
         from zoneinfo import ZoneInfo
         tz = "Europe/Rome"
