@@ -26,6 +26,10 @@ class FakeNotifier:
 
 class FakeSettings:
     lega = {"idcomp": 700047, "divisione": "A"}
+    tz = "Europe/Rome"
+    buffer_invio_min = 30
+    cutoff_fallback = {0: "18:15", 1: "18:15", 2: "18:15", 3: "18:15",
+                       4: "18:15", 5: "12:15", 6: "12:15"}
 
 def prov_ok():
     return ({"teamLineupDto": {"cmday": 4}, "lineUpInfo": []}, object(), ORA)
@@ -123,6 +127,58 @@ class TestEngine(unittest.TestCase):
         g = self.store.get(700047, 4)
         self.assertEqual(g.stato, PROPOSTA)      # torna a PROPOSTA con la vecchia proposta
         self.assertEqual(g.spec, spec_prima)     # spec invariato
+
+    def test_heartbeat_prepara_se_giorno_di_match(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        oggi = datetime.now(ZoneInfo("Europe/Rome")).date().isoformat()
+        class BrainCal(FakeBrain):
+            def calendario(self, cmday, squadre):
+                return [{"squadra": "Juventus", "kickoff": f"{oggi}T15:00"}]
+        e = self._engine(brain=BrainCal())
+        def provider():
+            return ({"teamLineupDto": {"cmday": 4},
+                     "lineUpInfo": [{"role": [1], "plyr": "V", "tname": "Juventus",
+                                     "teamH": "SAS", "teamA": "JUV", "hoaw": 1,
+                                     "percent": 90, "status": 1, "agrd": 6, "fagrd": 6}]},
+                    object(), None)
+        e.heartbeat(provider, oggi_iso=oggi)
+        g = self.store.get(700047, 4)
+        self.assertIsNotNone(g)
+        self.assertEqual(g.stato, PROPOSTA)
+
+    def test_heartbeat_non_prepara_se_match_non_oggi(self):
+        from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
+        oggi = datetime.now(ZoneInfo("Europe/Rome")).date()
+        fra_tre = (oggi + timedelta(days=3)).isoformat()
+        class BrainCal(FakeBrain):
+            def calendario(self, cmday, squadre):
+                return [{"squadra": "Juventus", "kickoff": f"{fra_tre}T15:00"}]
+        e = self._engine(brain=BrainCal())
+        def provider():
+            return ({"teamLineupDto": {"cmday": 4},
+                     "lineUpInfo": [{"role": [1], "plyr": "V", "tname": "Juventus",
+                                     "teamH": "SAS", "teamA": "JUV", "hoaw": 1,
+                                     "percent": 90, "status": 1, "agrd": 6, "fagrd": 6}]},
+                    object(), None)
+        e.heartbeat(provider, oggi_iso=oggi.isoformat())
+        self.assertIsNone(self.store.get(700047, 4))
+
+    def test_heartbeat_non_prepara_se_calendario_invalido(self):
+        class BrainNoCal(FakeBrain):
+            def calendario(self, cmday, squadre):
+                return []
+        e = self._engine(brain=BrainNoCal())
+        def provider():
+            return ({"teamLineupDto": {"cmday": 4},
+                     "lineUpInfo": [{"role": [1], "plyr": "V", "tname": "Juventus",
+                                     "teamH": "SAS", "teamA": "JUV", "hoaw": 1,
+                                     "percent": 90, "status": 1, "agrd": 6, "fagrd": 6}]},
+                    object(), None)
+        e.heartbeat(provider)
+        self.assertIsNone(self.store.get(700047, 4))
+
 
 if __name__ == "__main__":
     unittest.main()

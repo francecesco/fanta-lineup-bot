@@ -97,3 +97,43 @@ class Engine:
         g = self.store.get(idcomp, cmday)
         if g and g.stato == PROPOSTA:
             self.invia_ora(idcomp, cmday)
+
+    def heartbeat(self, provider, oggi_iso=None):
+        from datetime import datetime, date, time
+        from zoneinfo import ZoneInfo
+        from bot import orari
+        tz = self.settings.tz
+        oggi = date.fromisoformat(oggi_iso) if oggi_iso else datetime.now(ZoneInfo(tz)).date()
+        adesso = datetime.combine(oggi, time(0, 0), ZoneInfo(tz))  # inizio giornata: i kickoff odierni sono "futuri"
+        res, _session, _ = provider()
+        idcomp = self.settings.lega["idcomp"]
+        cmday = gio.cmday(res)
+        if self.store.get(idcomp, cmday):
+            return  # già gestita (idempotenza)
+        squadre = gio.squadre_utente(res)
+        cal = self.brain.calendario(cmday, squadre)
+        if not orari.calendario_valido(cal, adesso, tz=tz):
+            return  # nessun calendario affidabile: non si prepara oggi (limite noto)
+        ora_limite = orari.ora_limite(cal, self.settings.buffer_invio_min, adesso,
+                                      self.settings.cutoff_fallback, tz)
+        if ora_limite.date() != oggi:
+            return  # il prossimo match dei tuoi non è oggi
+        g, creata = self.store.crea_se_assente(idcomp, cmday, ora_limite)
+        if creata:
+            self.prepara(idcomp, cmday, res, ora_limite)
+
+    def on_evento_riconcilia(self, tipo, g, provider):
+        self._provider = provider
+        if tipo == "invia":
+            self.invia_ora(g.idcomp, g.cmday)
+        elif tipo == "verifica_invio":
+            res, _session, _ = provider()
+            mdl_sito = res.get("teamLineupDto", {}).get("mdl")
+            atteso = (g.spec or {}).get("modulo")
+            if mdl_sito and atteso and mdl_sito == atteso:
+                self.store.segna_inviata(g.idcomp, g.cmday)
+            else:
+                self.store.segna_errore(g.idcomp, g.cmday, "invio interrotto: verifica manuale")
+        elif tipo == "prepara":
+            res, _session, ol = provider()
+            self.prepara(g.idcomp, g.cmday, res, g.ora_limite or ol)
