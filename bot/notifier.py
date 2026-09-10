@@ -75,8 +75,14 @@ class TelegramNotifier(Notifier):
                 cq = u["callback_query"]
                 if str(cq.get("message", {}).get("chat", {}).get("id")) != str(chat_id):
                     continue
-                tipo, idcomp, cmday = cq["data"].split(":")
-                eventi.append(Evento(tipo, int(idcomp), int(cmday)))
+                parti = cq.get("data", "").split(":")
+                if len(parti) != 3:
+                    continue  # callback malformato: non far crashare il polling loop
+                tipo, idcomp, cmday = parti
+                try:
+                    eventi.append(Evento(tipo, int(idcomp), int(cmday)))
+                except ValueError:
+                    continue
             elif "message" in u and "text" in u["message"]:
                 m = u["message"]
                 if str(m.get("chat", {}).get("id")) != str(chat_id):

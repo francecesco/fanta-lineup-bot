@@ -44,5 +44,11 @@ class TestParse(unittest.TestCase):
         self.assertIn("reply_markup", params)
         self.assertIn("blocca:700047:4", json.dumps(params["reply_markup"]))
 
+    def test_messaggio_da_chat_non_autorizzata_ignorato_anche_in_attesa(self):
+        n = self._n()
+        n._attesa_modifica = (700047, 4)
+        upd = [{"update_id": 3, "message": {"chat": {"id": 111}, "text": "hack"}}]
+        self.assertEqual(n._parse_updates(upd, "999"), [])
+
 if __name__ == "__main__":
     unittest.main()
