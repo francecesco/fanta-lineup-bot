@@ -3,6 +3,7 @@ from datetime import datetime, date, time
 from zoneinfo import ZoneInfo
 from bot import giornata as gio
 from bot import orari
+from bot import formato
 from bot.brain import BrainError
 from bot.invio import InvioError
 from bot.notifier import Evento
@@ -18,12 +19,9 @@ class Engine:
         self.settings = settings
         self._provider = None   # callable () -> (res_lineup, session, ora_limite)
 
-    @staticmethod
-    def _testo_proposta(spec, ora_limite):
-        tit = ", ".join(spec.get("titolari", []))
-        quando = ora_limite.strftime("%H:%M") if ora_limite else "?"
-        return (f"<b>Giornata: modulo {spec.get('modulo')}</b>\n{tit}\n\n"
-                f"Invio automatico entro le {quando} se non intervieni.")
+    def _testo_proposta(self, spec, ruoli, cmday, ora_limite):
+        return formato.messaggio_proposta(
+            spec, ruoli, self.settings.lega.get("nome", ""), cmday, ora_limite)
 
     @staticmethod
     def _testo_esito(stato, dettaglio=""):
@@ -47,7 +45,8 @@ class Engine:
             self._avvisa_errore(idcomp, cmday, str(e))
             return
         msg_id = self.notifier.manda_proposta(
-            {"idcomp": idcomp, "cmday": cmday}, spec, self._testo_proposta(spec, ora_limite))
+            {"idcomp": idcomp, "cmday": cmday}, spec,
+            self._testo_proposta(spec, gio.ruoli(res_lineup), cmday, ora_limite))
         self.store.set_proposta(idcomp, cmday, spec, msg_id, ora_limite)
 
     def _avvisa_errore(self, idcomp, cmday, dettaglio):
@@ -91,7 +90,8 @@ class Engine:
             self.store.set_proposta(ev.idcomp, ev.cmday, g.spec, g.msg_id, g.ora_limite)
             return
         msg_id = self.notifier.manda_proposta(
-            {"idcomp": ev.idcomp, "cmday": ev.cmday}, spec, self._testo_proposta(spec, ora_limite))
+            {"idcomp": ev.idcomp, "cmday": ev.cmday}, spec,
+            self._testo_proposta(spec, gio.ruoli(res), ev.cmday, ora_limite))
         self.store.set_proposta(ev.idcomp, ev.cmday, spec, msg_id, ora_limite)
 
     def invia_ora(self, idcomp, cmday):
@@ -225,11 +225,13 @@ class Engine:
         def nome(pid):
             p = info.get(pid)
             return p.get("plyr") if p else str(pid)
-        tit = ", ".join(nome(p) for p in (dto.get("starts") or []))
-        pan = ", ".join(nome(p) for p in (dto.get("bench") or []))
+        titolari = [nome(p) for p in (dto.get("starts") or [])]
+        panca = [nome(p) for p in (dto.get("bench") or [])]
+        if not titolari:
+            self.notifier.manda_messaggio("Sul sito non risulta ancora una formazione salvata.")
+            return
         self.notifier.manda_messaggio(
-            f"<b>Sul sito ora — modulo {dto.get('mdl') or '?'}</b>\n"
-            f"Titolari: {tit or '—'}\nPanchina: {pan or '—'}")
+            formato.messaggio_sito(titolari, panca, gio.ruoli(res), dto.get("mdl")))
 
     def _cmd_invia(self):
         _res, idcomp, cmday = self._contesto()

@@ -12,6 +12,10 @@ def _role(p):
 def cmday(res: dict) -> int:
     return res["teamLineupDto"]["cmday"]
 
+def ruoli(res: dict) -> dict:
+    """Mappa nome giocatore -> ruolo (P/D/C/A) dai dati del sito, per raggruppare in campo."""
+    return {p["plyr"]: _role(p) for p in res.get("lineUpInfo", []) if p.get("plyr")}
+
 def squadre_utente(res: dict) -> list:
     viste, out = set(), []
     for p in res.get("lineUpInfo", []):

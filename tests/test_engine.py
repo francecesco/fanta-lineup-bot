@@ -326,7 +326,7 @@ class TestComandi(unittest.TestCase):
         self._cmd(e, "/vedi", prov)
         blob = " ".join(self.notif.messaggi)
         self.assertIn("Vicario", blob)
-        self.assertIn("352", blob)
+        self.assertIn("3-5-2", blob)
 
     def test_invia_senza_proposta_avvisa(self):
         e = self._engine()
