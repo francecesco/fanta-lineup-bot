@@ -11,8 +11,9 @@ attivo, divisione diversa), vedi la sezione [Adattare a leghe diverse](#adattare
 
 - Python 3.9+ e `pip`
 - Un account su `leghe.fantacalcio.it` con almeno **una lega attiva** in cui sei allenatore
-- Il **listone quotazioni** ufficiale della stagione (file `.xlsx`, si scarica da fantacalcio.it)
 - Un browser con i **DevTools** (Chrome/Firefox) per la cattura iniziale
+- (Solo per la skill manuale `consiglia-formazione`, opzionale) il **listone quotazioni** ufficiale
+  della stagione in `.xlsx` — il bot e l'invio **non** ne hanno bisogno, leggono la rosa dal sito
 - (Facoltativo) la CLI `gh` se vuoi versionare la tua copia su GitHub
 
 ---
@@ -100,13 +101,16 @@ Inserisci `FANTA_USER` e `FANTA_PWD`. Anche `.env` è in `.gitignore`.
 
 ---
 
-## 6. File dati
+## 6. File dati (opzionale)
 
-Metti nella cartella del progetto:
+Il bot e `invia_formazione.py` ricavano la rosa (nome giocatore → ID) **dai dati del sito**
+(`get_lineup` → `lineUpInfo`): non serve alcun file Excel. Puoi saltare questa sezione.
+
+I due `.xlsx` servono **solo** se usi la skill manuale `consiglia-formazione`, che legge la rosa da
+Excel per ragionare sull'undici. In quel caso mettili nella cartella del progetto:
 
 - **Listone quotazioni** ufficiale, col nome indicato in `FILE_QUOTAZIONI`. Deve avere le colonne
-  `Id`, `R` (ruolo), `Nome`, `Squadra`. La colonna **`Id` è l'ID usato dall'API**: è la chiave di
-  tutto (il codice traduce i nomi in questi ID).
+  `Id`, `R` (ruolo), `Nome`, `Squadra`. La colonna **`Id` è l'ID usato dall'API**.
 - **`rosa.xlsx`** con la tua rosa. Genera un template e poi compilalo:
   ```bash
   skill/rosa.sh --template ./rosa.xlsx
@@ -114,7 +118,7 @@ Metti nella cartella del progetto:
   Colonne: `Ruolo` (P/D/C/A), `Giocatore`, `Squadra` (facoltative: `Quotazione`, `Pagato`, `Note`).
   **I nomi in `rosa.xlsx` devono combaciare esattamente con la colonna `Nome` del listone.**
 
-Verifica che tutto si leghi:
+Verifica che l'accesso al sito funzioni (nessun Excel necessario):
 ```bash
 python3 stato_giornata.py     # deve stampare la tua rosa con partite, %titolarità, stato
 ```
@@ -134,7 +138,7 @@ giocatori "scheletro fisso" (i tuoi intoccabili), regole di casa. Il resto della
 # 1) guarda lo stato di giornata
 python3 stato_giornata.py
 
-# 2) prepara la formazione (parti dall'esempio; nomi = colonna Giocatore di rosa.xlsx)
+# 2) prepara la formazione (parti dall'esempio; i nomi devono combaciare con quelli del sito)
 cp formazione.example.json formazione.json   # poi compilalo
 
 # 3) invia (chiede conferma; mostra l'anteprima e legge mday/cmday dal sito)
@@ -155,7 +159,8 @@ python3 tests/test_build_payload.py
 Oltre al flusso manuale, il progetto include un bot always-on (cartella `bot/`) che ogni giorno
 prepara la formazione, la propone su Telegram e la **invia da solo** prima del deadline se non
 intervieni (**auto-invio con veto**). Pensato per un piccolo server sempre acceso (Zimaboard,
-Raspberry, ...) via Docker.
+Raspberry, ...) via Docker. Gli servono **solo le credenziali del sito** (più chiave Gemini e bot
+Telegram): la rosa la legge dal sito, **nessun file Excel**.
 
 ### 9.1 Chiave Gemini (il ragionamento del bot)
 
@@ -193,7 +198,7 @@ mai infortunati, valuta l'avversario). Adattale al tuo stile nel *system prompt*
 
 ### 9.5 Avvio con Docker
 
-Con `.env`, `config.py` e i due `.xlsx` (rosa e listone) pronti nella cartella del progetto:
+Con `.env` e `config.py` pronti nella cartella del progetto (nessun `.xlsx` necessario):
 
 ```bash
 touch bot.db                 # crea il file del DB prima del primo avvio: il volume monta un file, non una cartella
@@ -246,7 +251,7 @@ momento. Senza Docker: `pip install -r requirements.txt` (serve **Python 3.12+**
 | `HTTP 400 ... ATH018` al login | credenziali errate | controlla `FANTA_USER`/`FANTA_PWD` in `.env` |
 | `HTTP 401 ... Bearer token missing` | token scaduto/mancante | gestito da `FantaSession` (ri-login automatico); se persiste, rifai login |
 | `LUP012 ... fixed bench` | panchina con numero sbagliato di giocatori | con panchina fissa servono ESATTAMENTE `tbench` (riempi anche con indisponibili in fondo) |
-| `'<nome>' non è nella tua rosa` | nome in `formazione.json` diverso da `rosa.xlsx` | usa la grafia esatta della colonna Giocatore |
-| `'<nome>' non trovato nel listone` | nome in `rosa.xlsx` diverso dal listone | allinea alla colonna `Nome` del listone quotazioni |
+| `'<nome>' non è nella tua rosa` | nome in `formazione.json` non presente nella rosa del sito | usa la grafia esatta con cui il sito nomina il giocatore (vedi `stato_giornata.py`) |
+| `'<nome>' non trovato in i dati del sito` | nome scritto diversamente da come lo espone il sito | allinea alla grafia del sito (o, per il flusso Excel, alla colonna `Nome` del listone) |
 | `Reparti non coerenti col modulo` | conteggio D/C/A ≠ modulo | correggi titolari o modulo |
 | ID/giornata sbagliati | `id_squadra`/`idcomp` errati | ricontrolla dall'URL (passo 2) |

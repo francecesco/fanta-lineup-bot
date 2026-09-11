@@ -16,7 +16,7 @@ import sys
 import build_payload as bp
 import config
 import fanta_api as fa
-from roster_map import RosterMap
+from roster_map import RosterSito
 
 RUOLO_NOME = {"P": "Por", "D": "Dif", "C": "Cen", "A": "Att"}
 
@@ -42,8 +42,6 @@ def anteprima(spec, rm):
 
 
 def invia(spec, conferma_automatica=False, base_dir="."):
-    rm = RosterMap(base_dir=base_dir)
-
     env = fa.load_env(f"{base_dir}/.env" if base_dir != "." else ".env")
     user, pwd = env.get("FANTA_USER"), env.get("FANTA_PWD")
     if not user or not pwd:
@@ -52,8 +50,11 @@ def invia(spec, conferma_automatica=False, base_dir="."):
     # Sessione con ri-login automatico se il token scade (robustezza).
     session = fa.FantaSession(user, pwd, config.LEGA["id_squadra"], config.LEGA["idcomp"])
 
-    # Lettura della giornata corrente DAL SITO (autorevole): mai indovinare mday/cmday.
-    dto = session.get_lineup()["teamLineupDto"]
+    # Un'unica lettura dal sito (autorevole): rosa (nome→id) + giornata corrente.
+    # La rosa arriva da lineUpInfo: nessun file Excel necessario.
+    res = session.get_lineup()
+    rm = RosterSito(res)
+    dto = res["teamLineupDto"]
     spec = dict(spec, mday=dto["mday"], cmday=dto["cmday"])   # sovrascrive quanto nel file
 
     payload = bp.build_payload(spec, rm=rm)          # valida tutto

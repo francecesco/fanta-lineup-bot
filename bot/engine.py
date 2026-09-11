@@ -30,7 +30,14 @@ class Engine:
                 "BLOCCATA": "❌ Invio bloccato: sistemala a mano sul sito.",
                 "ERRORE": f"⚠️ Problema: {dettaglio}. Controlla a mano."}[stato]
 
+    def _aggiorna_rosa(self, res):
+        """Rinfresca la rosa dai dati live del sito, se la fonte lo supporta (RosterSito)."""
+        agg = getattr(self.rm, "aggiorna", None)
+        if callable(agg):
+            agg(res)
+
     def prepara(self, idcomp, cmday, res_lineup, ora_limite):
+        self._aggiorna_rosa(res_lineup)
         tabella = gio.tabella_rosa(res_lineup)
         try:
             spec = self.brain.proponi(tabella, cmday)
@@ -70,6 +77,7 @@ class Engine:
         if not g or not g.spec:
             return
         res, _session, ora_limite = self._provider()
+        self._aggiorna_rosa(res)
         tabella = gio.tabella_rosa(res)
         try:
             spec = self.brain.modifica(g.spec, ev.testo, tabella, ev.cmday)
@@ -88,7 +96,8 @@ class Engine:
         if not self.store.prova_lock_invio(idcomp, cmday):
             return  # già in invio / non più inviabile
         g = self.store.get(idcomp, cmday)
-        _res, session, _ora = self._provider()
+        res, session, _ora = self._provider()
+        self._aggiorna_rosa(res)
         try:
             esito = self.invia_fn(g.spec, cmday, session, self.rm)
         except InvioError as e:

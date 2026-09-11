@@ -1,7 +1,7 @@
 """Entrypoint: compone le dipendenze reali e avvia il loop always-on."""
 import logging
 import fanta_api
-from roster_map import RosterMap
+from roster_map import RosterSito
 from bot import scheduler
 from bot.settings import carica_settings
 from bot.state import Store
@@ -25,9 +25,10 @@ def _make_provider(settings):
 
 def costruisci(settings, rm=None, brain=None, notifier=None):
     """Compone le dipendenze. rm/brain/notifier iniettabili per test ermetici; in
-    produzione restano None e si costruiscono i reali (RosterMap carica gli xlsx)."""
+    produzione restano None e si costruiscono i reali. La rosa (`RosterSito`) parte
+    vuota e viene popolata dai dati del sito a ogni get_lineup: nessun file Excel."""
     store = Store(settings.db_path)
-    rm = rm if rm is not None else RosterMap()
+    rm = rm if rm is not None else RosterSito()
     brain = brain if brain is not None else Brain(
         settings.gemini_api_key, settings.gemini_model,
         max_tentativi=settings.max_tentativi_gemini, rm=rm)

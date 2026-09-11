@@ -24,6 +24,12 @@ class FakeNotifier:
     def chiedi_testo_modifica(self, g): self.attese.append(g)
     def poll_eventi(self): return []
 
+class FakeRoster:
+    """Rosa dal sito simulata: registra le risposte con cui è stata aggiornata."""
+    def __init__(self): self.aggiornata_con = []
+    def aggiorna(self, res): self.aggiornata_con.append(res)
+    def resolve(self, name, require_owned=True): return (1, "P")
+
 class FakeSettings:
     lega = {"idcomp": 700047, "divisione": "A"}
     tz = "Europe/Rome"
@@ -39,10 +45,30 @@ class TestEngine(unittest.TestCase):
         self.store = Store(":memory:"); self.addCleanup(self.store.chiudi)
         self.notif = FakeNotifier()
 
-    def _engine(self, brain=None, invia_fn=None):
+    def _engine(self, brain=None, invia_fn=None, rm=None):
         return Engine(self.store, brain or FakeBrain(), self.notif,
                       invia_fn or (lambda spec, cmday, session, rm: {"mdl": "343", "verificato": True}),
-                      rm=None, settings=FakeSettings())
+                      rm=rm, settings=FakeSettings())
+
+    def test_prepara_aggiorna_rosa_dal_sito(self):
+        rm = FakeRoster()
+        e = self._engine(rm=rm)
+        self.store.crea_se_assente(700047, 4, ORA)
+        res = {"lineUpInfo": [{"pid": 1, "plyr": "V", "role": [1], "tname": "Juventus",
+                               "teamH": "SAS", "teamA": "JUV", "hoaw": 1,
+                               "percent": 90, "status": 1, "agrd": 6, "fagrd": 6}]}
+        e.prepara(700047, 4, res, ORA)
+        self.assertEqual(rm.aggiornata_con, [res])   # rosa rinfrescata prima di proporre
+
+    def test_invia_ora_aggiorna_rosa_dal_sito(self):
+        rm = FakeRoster()
+        e = self._engine(rm=rm)
+        self.store.crea_se_assente(700047, 4, ORA)
+        e.prepara(700047, 4, {"lineUpInfo": []}, ORA)
+        e._provider = prov_ok
+        e.invia_ora(700047, 4)
+        # l'ultima aggiornata è la risposta del provider usata per l'invio
+        self.assertEqual(rm.aggiornata_con[-1], prov_ok()[0])
 
     def test_prepara_propone_e_notifica(self):
         e = self._engine()

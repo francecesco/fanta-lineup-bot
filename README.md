@@ -25,24 +25,28 @@ panchina, e **carica la formazione** sul sito via API — senza browser.
 ## Come funziona (pipeline)
 
 ```
-rosa.xlsx + listone quotazioni
+ sito fantacalcio.it (login via API)
         │
         ▼
- stato_giornata.py ──► dati di giornata dal sito (avversari, %titolarità, infortuni)
+ stato_giornata.py ──► dati di giornata dal sito (rosa, avversari, %titolarità, infortuni)
         │
         ▼
  scelta undici/modulo  ──►  formazione.json  (spec: modulo, titolari, panchina)
         │
         ▼
- invia_formazione.py ──► login ─► legge mday/cmday dal sito ─► anteprima ─► conferma ─► invio
+ invia_formazione.py ──► login ─► rosa e mday/cmday dal sito ─► anteprima ─► conferma ─► invio
 ```
+
+La rosa (nome giocatore → ID) si ricava dai dati del sito: **nessun file Excel è
+necessario** per leggere lo stato di giornata, inviare la formazione o far girare il bot.
 
 ## Requisiti
 
 - **Python 3.12+** (il bot autonomo usa `zoneinfo` e type hints moderni; il flusso manuale gira
   anche su 3.9+).
-- `pip install -r requirements.txt` — installa `openpyxl` (lettura `.xlsx`) e `tzdata` (database
-  fusi orari per il bot). `fanta_api.py` e `build_payload.py` usano solo la libreria standard.
+- `pip install -r requirements.txt` — installa `tzdata` (fusi orari, unica dipendenza del bot) e
+  `openpyxl`, quest'ultimo **opzionale**, usato solo dal flusso manuale basato su Excel (skill
+  `consiglia-formazione`). Il bot e l'invio ricavano la rosa dai dati del sito: sono stdlib puro.
 - Solo per il **bot autonomo**: una **API key Gemini** (Google AI Studio, gratuita) in
   `GEMINI_API_KEY` e un **bot Telegram** (token + chat id) — vedi
   [Bot autonomo](#bot-autonomo-zimaboard).
@@ -68,7 +72,9 @@ cp config.example.py config.py   # poi inserisci id_squadra e idcomp
 Come ricavare `id_squadra` e `idcomp`: da loggato sul sito, guarda l'URL della tua lega —
 `.../view/rosters/<id_squadra>` e `.../view/competition/<idcomp>/lineup`.
 
-**File dati** (non inclusi, mettili nella cartella del progetto):
+**File dati** — **opzionali**: il bot e `invia_formazione.py` leggono la rosa dal sito e non ne
+hanno bisogno. Servono solo se usi la skill manuale `consiglia-formazione` (che legge la rosa da
+Excel per ragionare sull'undici):
 - `Quotazioni.xlsx` — il listone ufficiale (colonne `Id`, `R`, `Nome`, `Squadra`); il nome file
   atteso è configurabile in `config.py` (`FILE_QUOTAZIONI`)
 - `rosa.xlsx` — la tua rosa (colonne `Ruolo`, `Giocatore`, ...). Puoi generare un template con
@@ -138,8 +144,9 @@ il resto del bot.
 
 ### Avvio con Docker
 
-Con `.env`, `config.py` e i due file `.xlsx` (rosa e listone quotazioni) già pronti nella
-cartella del progetto (vedi sezione [Setup](#setup) sopra):
+Al bot bastano `.env` (credenziali del sito + Gemini + Telegram) e `config.py` (id lega) già
+pronti nella cartella del progetto (vedi sezione [Setup](#setup) sopra). **Nessun file Excel**:
+la rosa la legge dal sito.
 
 ```bash
 touch bot.db   # crea il file del DB prima del primo avvio, così il volume monta un file e non una cartella
@@ -166,7 +173,7 @@ docker compose down
 
 ```
 fanta_api.py            client HTTP + FantaSession (ri-login automatico)
-roster_map.py           nome giocatore ↔ ID + verifica rosa
+roster_map.py           nome giocatore ↔ ID: RosterSito (dai dati del sito) e RosterMap (da Excel)
 build_payload.py        costruzione e validazione del payload
 stato_giornata.py       stato di giornata leggibile dal sito
 invia_formazione.py     flusso completo di invio

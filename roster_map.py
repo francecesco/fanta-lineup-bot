@@ -1,10 +1,15 @@
 """Mappa nome giocatore ↔ ID fantacalcio.it, con ruolo e squadra.
 
-Fonte ID/ruolo: il listone `Quotazioni_*.xlsx` (colonna `Id` = ID usato dall'API,
-verificato). Fonte dei giocatori posseduti: `rosa.xlsx`.
+Due fonti, stessa interfaccia (`resolve`, `role_of`, `owned`):
+
+- `RosterMap`: legge dai file Excel — listone `Quotazioni_*.xlsx` (colonna `Id`)
+  per nome→ID/ruolo e `rosa.xlsx` per i giocatori posseduti.
+- `RosterSito`: ricava tutto dai dati del sito (`get_lineup` → `lineUpInfo`,
+  campi `pid`/`plyr`/`role`), senza alcun file Excel. È la fonte usata dal bot
+  autonomo: bastano le credenziali del sito.
 
 Uso tipico:
-    rm = RosterMap()
+    rm = RosterMap()               # oppure RosterSito(res_get_lineup)
     rm.resolve("Calhanoglu")   -> (2194, "C")
 """
 
@@ -16,6 +21,9 @@ import config
 # openpyxl è importato in modo "lazy" dentro i metodi di caricamento: così build_payload
 # può essere usato con un RosterMap alternativo anche senza openpyxl installato.
 
+# Ruolo dall'API del sito (lineUpInfo[].role): 1=Portiere, 2=Difensore, 3=Centrocampista, 4=Attaccante.
+RUOLO_API = {1: "P", 2: "D", 3: "C", 4: "A"}
+
 
 def _norm(name):
     """Normalizza un nome per il confronto tollerante (accenti, maiuscole, spazi)."""
@@ -24,7 +32,57 @@ def _norm(name):
     return " ".join(s.lower().split())
 
 
-class RosterMap:
+def _role_api(role):
+    """Ruolo (P/D/C/A) dal campo `role` di lineUpInfo, che è una lista es. [1]."""
+    if isinstance(role, list):
+        role = role[0] if role else None
+    try:
+        return RUOLO_API.get(int(role), "")
+    except (TypeError, ValueError):
+        return ""
+
+
+def _risolvi(by_name, by_norm, owned, name, require_owned, fonte):
+    """Logica di risoluzione nome→(id, ruolo) condivisa dalle due fonti."""
+    key = str(name).strip()
+    if require_owned and key not in owned and _norm(key) not in {_norm(k) for k in owned}:
+        raise ValueError(f"'{name}' non è nella tua rosa")
+    if key in by_name:
+        pid, role, _ = by_name[key]
+        return pid, role
+    cands = by_norm.get(_norm(key), [])
+    if len(cands) == 1:
+        _n, pid, role = cands[0]
+        return pid, role
+    if not cands:
+        raise ValueError(f"'{name}' non trovato in {fonte}")
+    names = ", ".join(n for n, _, _ in cands)
+    raise ValueError(f"'{name}' è ambiguo in {fonte}: {names}. Usa il nome esatto.")
+
+
+class _BaseRoster:
+    """Interfaccia comune: struttura dati (`_by_name`, `_by_norm`, `owned`) + risoluzione."""
+
+    _fonte = "la rosa"
+
+    def resolve(self, name, require_owned=True):
+        """Restituisce (id, ruolo) per un giocatore. Solleva ValueError se non risolvibile.
+
+        Con require_owned=True, il giocatore deve essere posseduto (in rosa).
+        """
+        return _risolvi(self._by_name, self._by_norm, self.owned, name, require_owned, self._fonte)
+
+    def role_of(self, name):
+        return self.resolve(name)[1]
+
+    def aggiorna(self, res):
+        """Aggiorna la rosa dai dati del sito. Le fonti statiche (file) non fanno nulla."""
+        return None
+
+
+class RosterMap(_BaseRoster):
+    _fonte = "il listone quotazioni"
+
     def __init__(self, quotazioni=None, rosa=None, base_dir="."):
         self.quotazioni_path = os.path.join(base_dir, quotazioni or config.FILE_QUOTAZIONI)
         self.rosa_path = os.path.join(base_dir, rosa or config.FILE_ROSA)
@@ -74,27 +132,35 @@ class RosterMap:
             if name:
                 self.owned[name] = role
 
-    # ---- risoluzione ----
-    def resolve(self, name, require_owned=True):
-        """Restituisce (id, ruolo) per un giocatore. Solleva ValueError se non risolvibile.
 
-        Con require_owned=True, il giocatore deve essere in `rosa.xlsx`.
-        """
-        key = str(name).strip()
-        if require_owned and key not in self.owned and _norm(key) not in {_norm(k) for k in self.owned}:
-            raise ValueError(f"'{name}' non è nella tua rosa (rosa.xlsx)")
-        if key in self._by_name:
-            pid, role, _ = self._by_name[key]
-            return pid, role
-        cands = self._by_norm.get(_norm(key), [])
-        if len(cands) == 1:
-            _n, pid, role = cands[0]
-            return pid, role
-        if not cands:
-            raise ValueError(f"'{name}' non trovato nel listone quotazioni "
-                             f"({config.FILE_QUOTAZIONI})")
-        names = ", ".join(n for n, _, _ in cands)
-        raise ValueError(f"'{name}' è ambiguo nel listone: {names}. Usa il nome esatto.")
+class RosterSito(_BaseRoster):
+    """Rosa ricavata dai dati del sito (get_lineup → lineUpInfo), senza file Excel.
 
-    def role_of(self, name):
-        return self.resolve(name)[1]
+    `lineUpInfo` è la tua rosa completa da 25: ogni elemento porta `pid` (ID API),
+    `plyr` (nome) e `role` (ruolo). Passa la risposta di get_lineup al costruttore,
+    oppure chiama `aggiorna(res)` per rinfrescarla a ogni lettura dal sito.
+    """
+
+    _fonte = "i dati del sito"
+
+    def __init__(self, res=None):
+        self._by_name = {}
+        self._by_norm = {}
+        self.owned = {}
+        if res is not None:
+            self.aggiorna(res)
+
+    def aggiorna(self, res):
+        by_name, by_norm, owned = {}, {}, {}
+        for p in (res.get("lineUpInfo") or []):
+            name = str(p.get("plyr") or "").strip()
+            pid = p.get("pid")
+            if not name or pid is None:
+                continue
+            role = _role_api(p.get("role"))
+            team = str(p.get("tname") or "")
+            by_name[name] = (int(pid), role, team)
+            by_norm.setdefault(_norm(name), []).append((name, int(pid), role))
+            owned[name] = role
+        # Riassegnazione atomica: una resolve concorrente vede sempre una rosa completa.
+        self._by_name, self._by_norm, self.owned = by_name, by_norm, owned

@@ -1,6 +1,7 @@
-# Solo per leggere i file .xlsx (rosa e listone quotazioni).
-# fanta_api.py e build_payload.py usano solo la libreria standard.
-# Anche il bot (bot/) è stdlib puro (incluso il client Telegram, via urllib):
-# openpyxl serve solo a RosterMap per leggere gli .xlsx.
+# tzdata: database fusi orari per zoneinfo (le immagini slim non lo includono sempre).
+# È l'unica dipendenza del BOT autonomo: fanta_api, build_payload, RosterSito e il
+# client Telegram sono stdlib puro, e la rosa arriva dai dati del sito (niente Excel).
+tzdata
+# openpyxl: opzionale, serve SOLO al flusso manuale basato su Excel (RosterMap +
+# skill consiglia-formazione che legge rosa.xlsx). Il bot non lo usa.
 openpyxl>=3.1
-tzdata   # database fusi orari per zoneinfo (immagini slim non lo includono sempre)

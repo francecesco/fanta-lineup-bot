@@ -8,9 +8,8 @@ services:
     volumes:
       - ./.env:/app/.env:ro
       - ./config.py:/app/config.py:ro
-      # i nomi dei file .xlsx qui sotto devono corrispondere a FILE_ROSA / FILE_QUOTAZIONI in config.py
-      - ./rosa.xlsx:/app/rosa.xlsx:ro
-      - ./Quotazioni_Fantacalcio_Stagione_2026_27.xlsx:/app/Quotazioni_Fantacalcio_Stagione_2026_27.xlsx:ro
+      # Nessun file .xlsx: il bot ricava la rosa (nome→id) dai dati del sito (get_lineup).
+      # Bastano credenziali (.env) e id lega (config.py).
       # bot.db va pre-creato sull'host (touch bot.db) prima del primo avvio: se il file non
       # esiste, Docker monta una directory al suo posto e sqlite3.connect() fallisce.
       - ./bot.db:/app/bot.db
