@@ -50,5 +50,37 @@ class TestParse(unittest.TestCase):
         upd = [{"update_id": 3, "message": {"chat": {"id": 111}, "text": "hack"}}]
         self.assertEqual(n._parse_updates(upd, "999"), [])
 
+    def test_comando_slash_diventa_evento_comando(self):
+        n = self._n()
+        upd = [{"update_id": 4, "message": {"chat": {"id": 999}, "text": "/stato"}}]
+        self.assertEqual(n._parse_updates(upd, "999"), [Evento("comando", 0, 0, "/stato")])
+
+    def test_comando_con_argomenti(self):
+        n = self._n()
+        upd = [{"update_id": 5, "message": {"chat": {"id": 999}, "text": "/modifica gioca il 352"}}]
+        self.assertEqual(n._parse_updates(upd, "999"),
+                         [Evento("comando", 0, 0, "/modifica gioca il 352")])
+
+    def test_comando_prevale_su_attesa_modifica_e_la_azzera(self):
+        n = self._n()
+        n._attesa_modifica = (700047, 4)
+        upd = [{"update_id": 6, "message": {"chat": {"id": 999}, "text": "/stato"}}]
+        self.assertEqual(n._parse_updates(upd, "999"), [Evento("comando", 0, 0, "/stato")])
+        self.assertIsNone(n._attesa_modifica)
+
+    def test_comando_da_chat_non_autorizzata_ignorato(self):
+        n = self._n()
+        upd = [{"update_id": 7, "message": {"chat": {"id": 111}, "text": "/invia"}}]
+        self.assertEqual(n._parse_updates(upd, "999"), [])
+
+    def test_registra_comandi_chiama_setmycommands(self):
+        inviati = []
+        def fake_post(metodo, params):
+            inviati.append((metodo, params)); return {"ok": True}
+        n = TelegramNotifier("tok", "999", http_get=lambda *a, **k: {}, http_post=fake_post)
+        n.registra_comandi()
+        self.assertEqual(inviati[0][0], "setMyCommands")
+        self.assertIn("formazione", json.dumps(inviati[0][1]))
+
 if __name__ == "__main__":
     unittest.main()

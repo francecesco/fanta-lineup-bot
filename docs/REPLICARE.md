@@ -219,6 +219,8 @@ momento. Senza Docker: `pip install -r requirements.txt` (serve **Python 3.12+**
 - Se non intervieni, **invia in automatico** all'`ora_limite` = **primo calcio d'inizio dell'intera
   giornata** (l'anticipo, anche di squadre in cui non hai giocatori) − `BUFFER_INVIO_MIN`. Il blocco
   del sito scatta lì: dal via del turno la formazione non è più modificabile.
+- **Comandi** che puoi mandare tu quando vuoi (menu `/` di Telegram): `/formazione` (proponi ora),
+  `/stato`, `/vedi` (formazione salvata sul sito), `/invia`, `/blocca`, `/modifica <testo>`, `/aiuto`.
 - **Idempotente**: ogni giornata è preparata e inviata una sola volta, anche con riavvii o crash.
 
 > ⚠️ **Prima volta**: fai un giro controllato e **non affidarti all'auto-invio** finché non hai visto

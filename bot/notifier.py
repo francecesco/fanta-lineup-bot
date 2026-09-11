@@ -12,6 +12,17 @@ class Evento:
     cmday: int
     testo: str | None = None
 
+# Comandi che l'utente può mandare al bot (nome, descrizione per il menu Telegram).
+COMANDI = [
+    ("formazione", "Calcola e proponi la formazione adesso"),
+    ("stato", "Stato della giornata e ora limite d'invio"),
+    ("vedi", "Mostra la formazione salvata sul sito"),
+    ("invia", "Invia subito la proposta corrente"),
+    ("blocca", "Blocca l'auto-invio di questa giornata"),
+    ("modifica", "Modifica a parole (es. /modifica gioca il 352)"),
+    ("aiuto", "Elenco dei comandi"),
+]
+
 class Notifier(ABC):
     @abstractmethod
     def manda_proposta(self, giornata, spec, testo): ...
@@ -23,6 +34,9 @@ class Notifier(ABC):
     def chiedi_testo_modifica(self, giornata): ...
     @abstractmethod
     def poll_eventi(self): ...
+    def registra_comandi(self):
+        """Registra il menu comandi sul canale (no-op se il canale non lo supporta)."""
+        return None
 
 def _get_reale(url):
     return json.load(urllib.request.urlopen(url, timeout=60))
@@ -75,6 +89,10 @@ class TelegramNotifier(Notifier):
             "chat_id": self.chat_id,
             "text": "Cosa cambio? Scrivimelo a parole (es. \"gioca il 352, A3 titolare\")."})
 
+    def registra_comandi(self):
+        self._post("setMyCommands", {
+            "commands": [{"command": c, "description": d} for c, d in COMANDI]})
+
     def _parse_updates(self, updates, chat_id):
         eventi = []
         for u in updates:
@@ -94,9 +112,14 @@ class TelegramNotifier(Notifier):
                 m = u["message"]
                 if str(m.get("chat", {}).get("id")) != str(chat_id):
                     continue
-                if self._attesa_modifica:
+                testo = m["text"]
+                if testo.lstrip().startswith("/"):
+                    # Un comando interrompe l'eventuale attesa di modifica.
+                    self._attesa_modifica = None
+                    eventi.append(Evento("comando", 0, 0, testo.strip()))
+                elif self._attesa_modifica:
                     idcomp, cmday = self._attesa_modifica
-                    eventi.append(Evento("modifica_testo", idcomp, cmday, m["text"]))
+                    eventi.append(Evento("modifica_testo", idcomp, cmday, testo))
         return eventi
 
     def poll_eventi(self):

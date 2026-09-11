@@ -278,5 +278,90 @@ class TestEngine(unittest.TestCase):
         self.assertEqual(self.store.get(700047, 4).stato, INVIATA)
 
 
+class TestComandi(unittest.TestCase):
+    def setUp(self):
+        self.store = Store(":memory:"); self.addCleanup(self.store.chiudi)
+        self.notif = FakeNotifier()
+
+    def _engine(self, brain=None, invia_fn=None):
+        return Engine(self.store, brain or FakeBrain(), self.notif,
+                      invia_fn or (lambda spec, cmday, session, rm: {"mdl": "343", "verificato": True}),
+                      rm=None, settings=FakeSettings())
+
+    def _cmd(self, e, testo, provider=prov_ok):
+        e.on_evento(Evento("comando", 0, 0, testo), provider)
+
+    def test_aiuto_elenca_comandi(self):
+        e = self._engine()
+        self._cmd(e, "/aiuto")
+        self.assertTrue(any("/formazione" in m for m in self.notif.messaggi))
+
+    def test_formazione_prepara_e_propone(self):
+        e = self._engine()
+        self._cmd(e, "/formazione")
+        g = self.store.get(700047, 4)
+        self.assertIsNotNone(g)
+        self.assertEqual(g.stato, PROPOSTA)
+        self.assertEqual(len(self.notif.mandati), 1)
+
+    def test_stato_non_preparata(self):
+        e = self._engine()
+        self._cmd(e, "/stato")
+        self.assertTrue(any("non ancora preparata" in m for m in self.notif.messaggi))
+
+    def test_stato_dopo_proposta(self):
+        e = self._engine()
+        self.store.crea_se_assente(700047, 4, ORA)
+        e.prepara(700047, 4, {"lineUpInfo": []}, ORA)
+        self._cmd(e, "/stato")
+        self.assertTrue(any("PROPOSTA" in m for m in self.notif.messaggi))
+
+    def test_vedi_mostra_formazione_dal_sito(self):
+        e = self._engine()
+        def prov():
+            return ({"teamLineupDto": {"cmday": 4, "mdl": "352", "starts": [10], "bench": [20]},
+                     "lineUpInfo": [{"pid": 10, "plyr": "Vicario", "role": [1]},
+                                    {"pid": 20, "plyr": "Corvi", "role": [1]}]},
+                    object(), None)
+        self._cmd(e, "/vedi", prov)
+        blob = " ".join(self.notif.messaggi)
+        self.assertIn("Vicario", blob)
+        self.assertIn("352", blob)
+
+    def test_invia_senza_proposta_avvisa(self):
+        e = self._engine()
+        self._cmd(e, "/invia")
+        self.assertTrue(any("Nessuna proposta" in m for m in self.notif.messaggi))
+        self.assertIsNone(self.store.get(700047, 4))
+
+    def test_invia_con_proposta_invia(self):
+        e = self._engine()
+        self.store.crea_se_assente(700047, 4, ORA)
+        e.prepara(700047, 4, {"lineUpInfo": []}, ORA)
+        self._cmd(e, "/invia")
+        self.assertEqual(self.store.get(700047, 4).stato, INVIATA)
+
+    def test_blocca_blocca(self):
+        e = self._engine()
+        self.store.crea_se_assente(700047, 4, ORA)
+        e.prepara(700047, 4, {"lineUpInfo": []}, ORA)
+        self._cmd(e, "/blocca")
+        self.assertEqual(self.store.get(700047, 4).stato, BLOCCATA)
+
+    def test_modifica_con_argomento_ripropone(self):
+        e = self._engine()
+        self.store.crea_se_assente(700047, 4, ORA)
+        e.prepara(700047, 4, {"lineUpInfo": []}, ORA)
+        self._cmd(e, "/modifica gioca il 352")
+        g = self.store.get(700047, 4)
+        self.assertEqual(g.stato, PROPOSTA)
+        self.assertEqual(g.spec["modulo"], "352")
+
+    def test_comando_sconosciuto_avvisa(self):
+        e = self._engine()
+        self._cmd(e, "/pippo")
+        self.assertTrue(any("sconosciuto" in m.lower() for m in self.notif.messaggi))
+
+
 if __name__ == "__main__":
     unittest.main()

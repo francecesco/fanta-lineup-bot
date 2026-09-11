@@ -142,6 +142,24 @@ il resto del bot.
    e leggi `message.chat.id` dalla risposta JSON: è il tuo `chat_id` (va in
    `TELEGRAM_CHAT_ID` nel tuo `.env`). Il bot risponde solo a messaggi da questo `chat_id`.
 
+### Comandi Telegram
+
+Oltre ai bottoni sotto la proposta (**❌ Blocca · ✏️ Modifica · ✅ Conferma**), puoi
+**guidare tu** il bot in qualsiasi momento con dei comandi (compaiono nel menu `/` di Telegram,
+registrati all'avvio):
+
+| Comando | Cosa fa |
+|---|---|
+| `/formazione` | calcola e propone la formazione **adesso** (senza aspettare l'heartbeat) |
+| `/stato` | stato della giornata corrente e ora limite d'invio |
+| `/vedi` | mostra la formazione **attualmente salvata sul sito** |
+| `/invia` | invia subito la proposta corrente |
+| `/blocca` | blocca l'auto-invio di questa giornata |
+| `/modifica <testo>` | modifica a parole (es. `/modifica gioca il 352, dentro Bowie`) |
+| `/aiuto` | elenco dei comandi |
+
+Il bot risponde solo al tuo `TELEGRAM_CHAT_ID`.
+
 ### Avvio con Docker
 
 Al bot bastano `.env` (credenziali del sito + Gemini + Telegram) e `config.py` (id lega) già

@@ -44,6 +44,10 @@ def main():
     settings = carica_settings()
     engine, store, provider = costruisci(settings)
     engine._provider = provider
+    try:
+        engine.notifier.registra_comandi()   # menu "/" su Telegram
+    except Exception:
+        logging.exception("registrazione comandi Telegram fallita (procedo comunque)")
     logging.info("Bot avviato per lega %s", settings.lega.get("nome", settings.lega["idcomp"]))
     scheduler.run_loop(engine, store, settings, provider)
 

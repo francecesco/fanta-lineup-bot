@@ -5,7 +5,8 @@ from bot import giornata as gio
 from bot import orari
 from bot.brain import BrainError
 from bot.invio import InvioError
-from bot.state import PROPOSTA, IN_MODIFICA
+from bot.notifier import Evento
+from bot.state import PROPOSTA, IN_MODIFICA, INVIATA
 
 class Engine:
     def __init__(self, store, brain, notifier, invia_fn, rm, settings):
@@ -60,6 +61,9 @@ class Engine:
     def on_evento(self, ev, provider=None):
         if provider:
             self._provider = provider
+        if ev.tipo == "comando":
+            self._esegui_comando(ev.testo)
+            return
         if ev.tipo == "blocca":
             if self.store.blocca(ev.idcomp, ev.cmday):
                 g = self.store.get(ev.idcomp, ev.cmday)
@@ -139,6 +143,126 @@ class Engine:
         g, creata = self.store.crea_se_assente(idcomp, cmday, ora_limite)
         if creata:
             self.prepara(idcomp, cmday, res, ora_limite)
+
+    # ---- comandi Telegram (guidati dall'utente) ----
+    _AIUTO = (
+        "<b>Comandi</b>\n"
+        "/formazione — calcola e proponi la formazione adesso\n"
+        "/stato — stato della giornata e ora limite\n"
+        "/vedi — mostra la formazione salvata sul sito\n"
+        "/invia — invia subito la proposta corrente\n"
+        "/blocca — blocca l'auto-invio di questa giornata\n"
+        "/modifica &lt;testo&gt; — modifica a parole (es. /modifica gioca il 352)\n"
+        "/aiuto — questo messaggio")
+
+    def _esegui_comando(self, testo):
+        parti = (testo or "").strip().split(maxsplit=1)
+        cmd = parti[0].lstrip("/").split("@")[0].lower() if parti else ""
+        arg = parti[1].strip() if len(parti) > 1 else ""
+        if cmd in ("aiuto", "help", "start", ""):
+            self.notifier.manda_messaggio(self._AIUTO)
+            return
+        if self._provider is None:
+            self.notifier.manda_messaggio("⚠️ Non riesco a leggere dal sito ora, riprova tra poco.")
+            return
+        if cmd == "formazione":
+            self._cmd_formazione()
+        elif cmd == "stato":
+            self._cmd_stato()
+        elif cmd == "vedi":
+            self._cmd_vedi()
+        elif cmd == "invia":
+            self._cmd_invia()
+        elif cmd == "blocca":
+            self._cmd_blocca()
+        elif cmd == "modifica":
+            self._cmd_modifica(arg)
+        else:
+            self.notifier.manda_messaggio(f"Comando sconosciuto: /{cmd}\n\n{self._AIUTO}")
+
+    def _contesto(self):
+        """(res, idcomp, cmday) dalla lettura fresca del sito."""
+        res, _session, _ora = self._provider()
+        return res, self.settings.lega["idcomp"], gio.cmday(res)
+
+    def _ora_limite_turno(self, cmday):
+        adesso = datetime.now(ZoneInfo(self.settings.tz))
+        try:
+            cal = self.brain.calendario(cmday)
+        except Exception:
+            cal = []
+        return orari.ora_limite(cal, self.settings.buffer_invio_min, adesso,
+                                self.settings.cutoff_fallback, self.settings.tz)
+
+    def _cmd_formazione(self):
+        res, idcomp, cmday = self._contesto()
+        g = self.store.get(idcomp, cmday)
+        if g and g.stato == INVIATA:
+            self.notifier.manda_messaggio(
+                f"Giornata {cmday}: già inviata. Usa /vedi per rileggerla dal sito.")
+            return
+        ora_limite = self._ora_limite_turno(cmday)
+        self.store.crea_se_assente(idcomp, cmday, ora_limite)
+        self.prepara(idcomp, cmday, res, ora_limite)
+
+    def _cmd_stato(self):
+        _res, idcomp, cmday = self._contesto()
+        g = self.store.get(idcomp, cmday)
+        if not g:
+            self.notifier.manda_messaggio(
+                f"Giornata {cmday}: non ancora preparata. Usa /formazione per prepararla ora.")
+            return
+        ol = g.ora_limite.strftime("%a %d/%m %H:%M") if g.ora_limite else "—"
+        testo = f"Giornata {cmday}: stato <b>{g.stato}</b> · ora limite {ol}"
+        if g.errore:
+            testo += f"\n⚠️ {g.errore}"
+        self.notifier.manda_messaggio(testo)
+
+    def _cmd_vedi(self):
+        res, _idcomp, _cmday = self._contesto()
+        dto = res.get("teamLineupDto", {})
+        info = {p.get("pid"): p for p in res.get("lineUpInfo", [])}
+        def nome(pid):
+            p = info.get(pid)
+            return p.get("plyr") if p else str(pid)
+        tit = ", ".join(nome(p) for p in (dto.get("starts") or []))
+        pan = ", ".join(nome(p) for p in (dto.get("bench") or []))
+        self.notifier.manda_messaggio(
+            f"<b>Sul sito ora — modulo {dto.get('mdl') or '?'}</b>\n"
+            f"Titolari: {tit or '—'}\nPanchina: {pan or '—'}")
+
+    def _cmd_invia(self):
+        _res, idcomp, cmday = self._contesto()
+        g = self.store.get(idcomp, cmday)
+        if not g or g.stato not in (PROPOSTA, IN_MODIFICA):
+            self.notifier.manda_messaggio(
+                "Nessuna proposta da inviare. Usa /formazione per prepararne una.")
+            return
+        self.invia_ora(idcomp, cmday)
+
+    def _cmd_blocca(self):
+        _res, idcomp, cmday = self._contesto()
+        if self.store.blocca(idcomp, cmday):
+            g = self.store.get(idcomp, cmday)
+            if g and g.msg_id:
+                self.notifier.aggiorna_messaggio(g.msg_id, self._testo_esito("BLOCCATA"))
+            else:
+                self.notifier.manda_messaggio(self._testo_esito("BLOCCATA"))
+        else:
+            self.notifier.manda_messaggio("Non c'è una proposta bloccabile per questa giornata.")
+
+    def _cmd_modifica(self, arg):
+        _res, idcomp, cmday = self._contesto()
+        g = self.store.get(idcomp, cmday)
+        if not g or not g.spec:
+            self.notifier.manda_messaggio(
+                "Non c'è una formazione da modificare. Usa /formazione prima.")
+            return
+        if not arg:
+            self.store.set_in_modifica(idcomp, cmday)
+            self.notifier.chiedi_testo_modifica({"idcomp": idcomp, "cmday": cmday})
+            return
+        self._applica_modifica(Evento("modifica_testo", idcomp, cmday, arg))
 
     def on_evento_riconcilia(self, tipo, g, provider):
         self._provider = provider
