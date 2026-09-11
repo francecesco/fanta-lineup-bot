@@ -91,19 +91,27 @@ class Brain:
                 f"Applica la modifica mantenendo la formazione valida. Chiudi con il solo JSON.")
         return self._cicla(_SYSTEM, user, cmday)
 
-    def calendario(self, cmday, squadre):
-        elenco = ", ".join(squadre)
-        system = ("Restituisci il calendario ufficiale della giornata di Serie A richiesta. "
-                  "Cerca su Google gli orari esatti. Rispondi con SOLO un array JSON, un elemento "
-                  'per squadra richiesta: [{"squadra":"<nome>","kickoff":"YYYY-MM-DDTHH:MM"}]. '
+    def calendario(self, cmday):
+        """Calendario COMPLETO del turno (tutte le partite).
+
+        Il deadline d'invio e' il PRIMO calcio d'inizio della giornata (l'anticipo),
+        anche di squadre in cui non ho giocatori: una volta iniziato il turno la
+        formazione non e' piu' modificabile. Serve quindi l'intero calendario, non
+        solo le partite delle mie squadre.
+        """
+        system = ("Restituisci il calendario COMPLETO della giornata di Serie A richiesta: "
+                  "TUTTE le partite del turno con l'orario esatto di calcio d'inizio. "
+                  "Cerca su Google. Rispondi con SOLO un array JSON, un elemento per partita: "
+                  '[{"partita":"Casa-Trasferta","kickoff":"YYYY-MM-DDTHH:MM"}]. '
                   "Orari in fuso Europe/Rome, senza testo attorno.")
-        user = f"Giornata {cmday} di Serie A. Squadre che mi interessano: {elenco}."
+        user = (f"Giornata {cmday} di Serie A: elencami TUTTE le partite del turno con data e "
+                f"ora di inizio, incluso l'anticipo che apre la giornata.")
         testo = self._genera(system, user)
         i, j = testo.find("["), testo.rfind("]")
         if i < 0 or j < 0:
             return []
         try:
             dati = json.loads(testo[i:j + 1])
-            return [d for d in dati if isinstance(d, dict) and "squadra" in d and "kickoff" in d]
+            return [d for d in dati if isinstance(d, dict) and "kickoff" in d]
         except ValueError:
             return []

@@ -127,14 +127,15 @@ class Engine:
         cmday = gio.cmday(res)
         if self.store.get(idcomp, cmday):
             return  # già gestita (idempotenza)
-        squadre = gio.squadre_utente(res)
-        cal = self.brain.calendario(cmday, squadre)
+        # Deadline = PRIMO calcio d'inizio dell'INTERO turno (l'anticipo), non della prima
+        # partita dei miei: dal fischio d'inizio della giornata la formazione è bloccata.
+        cal = self.brain.calendario(cmday)
         if not orari.calendario_valido(cal, adesso, tz=tz):
             return  # nessun calendario affidabile: non si prepara oggi (limite noto)
         ora_limite = orari.ora_limite(cal, self.settings.buffer_invio_min, adesso,
                                       self.settings.cutoff_fallback, tz)
         if ora_limite.date() != oggi:
-            return  # il prossimo match dei tuoi non è oggi
+            return  # il turno non inizia oggi
         g, creata = self.store.crea_se_assente(idcomp, cmday, ora_limite)
         if creata:
             self.prepara(idcomp, cmday, res, ora_limite)

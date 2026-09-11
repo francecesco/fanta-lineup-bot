@@ -216,17 +216,19 @@ momento. Senza Docker: `pip install -r requirements.txt` (serve **Python 3.12+**
 - Se sì, prepara la formazione con Gemini e manda la proposta su Telegram con tre azioni:
   **❌ Blocca** · **✏️ Modifica** (scrivi a parole cosa cambiare, il bot ripropone) ·
   **✅ Conferma** (invia subito).
-- Se non intervieni, **invia in automatico** all'`ora_limite` (primo kickoff − `BUFFER_INVIO_MIN`).
+- Se non intervieni, **invia in automatico** all'`ora_limite` = **primo calcio d'inizio dell'intera
+  giornata** (l'anticipo, anche di squadre in cui non hai giocatori) − `BUFFER_INVIO_MIN`. Il blocco
+  del sito scatta lì: dal via del turno la formazione non è più modificabile.
 - **Idempotente**: ogni giornata è preparata e inviata una sola volta, anche con riavvii o crash.
 
 > ⚠️ **Prima volta**: fai un giro controllato e **non affidarti all'auto-invio** finché non hai visto
 > almeno una proposta corretta e testato i tre pulsanti.
 
-> ℹ️ **Limite noto**: l'orario del match non è esposto dal sito, quindi il bot lo ricava dal calendario
-> via Gemini. Prepara solo se il calendario è affidabile e il tuo primo kickoff è **oggi**; se in un
-> giorno-match Gemini non desse un calendario valido, quel giorno non prepara in automatico (puoi
-> sempre usare il flusso manuale). Miglioria possibile: una fonte match-day dedicata (es. l'endpoint
-> calendario di fantacalcio).
+> ℹ️ **Limite noto**: l'orario del match non è esposto dal sito, quindi il bot ricava dal calendario
+> via Gemini **l'intera giornata** e usa come deadline il primo calcio d'inizio del turno. Prepara solo
+> se il calendario è affidabile e il turno **inizia oggi**; se in un giorno d'anticipo Gemini non
+> desse un calendario valido, quel giorno non prepara in automatico (puoi sempre usare il flusso
+> manuale). Miglioria possibile: una fonte match-day dedicata (es. l'endpoint calendario di fantacalcio).
 
 ---
 

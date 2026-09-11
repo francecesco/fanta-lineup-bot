@@ -73,26 +73,35 @@ class TestBrain(unittest.TestCase):
 
 class TestBrainCalendario(unittest.TestCase):
     def _brain(self, testo):
+        self.body = {}
         def fake_post(url, headers, body):
+            self.body = json.loads(body)
             return {"candidates": [{"content": {"parts": [{"text": testo}]}}]}
         return Brain("k", "m", rm=FakeRoster(), http_post=fake_post)
 
-    def test_calendario_happy(self):
+    def test_calendario_intera_giornata(self):
+        # Calendario COMPLETO del turno: il primo kickoff (l'anticipo) e' il deadline.
         b = self._brain('Ecco il calendario: '
-                        '[{"squadra":"Inter","kickoff":"2026-09-12T20:45"},'
-                        '{"squadra":"Juventus","kickoff":"2026-09-12T15:00"}]')
-        cal = b.calendario(4, ["Inter", "Juventus"])
+                        '[{"partita":"Venezia-Fiorentina","kickoff":"2026-09-11T20:45"},'
+                        '{"partita":"Inter-Udinese","kickoff":"2026-09-14T20:45"}]')
+        cal = b.calendario(4)
         self.assertEqual(len(cal), 2)
-        self.assertEqual(cal[0]["squadra"], "Inter")
+        self.assertEqual(cal[0]["kickoff"], "2026-09-11T20:45")
+
+    def test_calendario_chiede_tutte_le_partite(self):
+        b = self._brain("[]")
+        b.calendario(4)
+        # Il prompt deve chiedere TUTTE le partite del turno, non solo le mie squadre.
+        self.assertIn("tutte le partite", json.dumps(self.body).lower())
 
     def test_calendario_json_illeggibile_ritorna_vuoto(self):
         b = self._brain("nessun array JSON qui")
-        self.assertEqual(b.calendario(4, ["Inter"]), [])
+        self.assertEqual(b.calendario(4), [])
 
-    def test_calendario_filtra_voci_malformate(self):
-        b = self._brain('[{"squadra":"Inter","kickoff":"2026-09-12T20:45"}, {"foo":1}, "x"]')
-        cal = b.calendario(4, ["Inter"])
-        self.assertEqual(cal, [{"squadra": "Inter", "kickoff": "2026-09-12T20:45"}])
+    def test_calendario_filtra_voci_senza_kickoff(self):
+        b = self._brain('[{"partita":"Inter-Udinese","kickoff":"2026-09-12T20:45"}, {"foo":1}, "x"]')
+        cal = b.calendario(4)
+        self.assertEqual(cal, [{"partita": "Inter-Udinese", "kickoff": "2026-09-12T20:45"}])
 
 if __name__ == "__main__":
     unittest.main()
